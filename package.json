@@ -1,0 +1,19 @@
+{
+  "name": "@false00/cyber-news",
+  "version": "1.0.0",
+  "description": "Adds an interactive cybersecurity news header to the Pi TUI, providing live feeds from BleepingComputer and deep-dive research summaries.",
+  "keywords": ["pi-package", "cybersecurity", "news", "security"],
+  "author": "false00",
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
