@@ -1,6 +1,6 @@
 {
   "name": "@false00/cyber-news",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Adds an interactive cybersecurity news header to the Pi TUI, providing live feeds from BleepingComputer and deep-dive research summaries.",
   "type": "module",
   "main": "dist/index.js",
