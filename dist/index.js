@@ -143,13 +143,27 @@ async function fetchAllNews() {
     }
     return allItems.sort((a, b) => a.weight - b.weight);
 }
+function visualLen(s) {
+    let len = 0;
+    for (const ch of s) {
+        len += ch.codePointAt(0) > 0xFFFF ? 2 : 1;
+    }
+    return len;
+}
 function col(s, w) {
-    if (s.length <= w)
-        return s + " ".repeat(w - s.length);
-    let i = w - 1;
-    while (i > 0 && (s.charCodeAt(i) & 0xFC00) === 0xDC00)
-        i--;
-    return s.slice(0, i) + ">";
+    const vlen = visualLen(s);
+    if (vlen <= w)
+        return s + " ".repeat(w - vlen);
+    let result = "";
+    let cur = 0;
+    for (const ch of s) {
+        const cw = ch.codePointAt(0) > 0xFFFF ? 2 : 1;
+        if (cur + cw > w - 1)
+            break;
+        result += ch;
+        cur += cw;
+    }
+    return result + "…";
 }
 function buildCountdownBar(remaining, w) {
     const totalBars = 10;
