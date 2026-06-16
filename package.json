@@ -2,18 +2,59 @@
   "name": "@false00/cyber-news",
   "version": "1.0.0",
   "description": "Adds an interactive cybersecurity news header to the Pi TUI, providing live feeds from BleepingComputer and deep-dive research summaries.",
-  "keywords": ["pi-package", "cybersecurity", "news", "security"],
-  "author": "false00",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "AGENTS.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cybersecurity",
+    "news",
+    "security",
+    "false00"
+  ],
   "license": "MIT",
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "false00 <jortega@curl.red>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/false00/cyber-news"
   },
   "publishConfig": {
     "access": "public"
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:tools": "node --import tsx --test tests/*.test.ts",
+    "test": "npm run typecheck && npm run build && npm run test:tools",
+    "prepublishOnly": "npm test && npm pack --dry-run"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

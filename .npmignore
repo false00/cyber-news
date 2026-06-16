@@ -1,6 +1,0 @@
-.llm-wiki/
-node_modules/
-.git/
-.DS_Store
-*.log
-.env
