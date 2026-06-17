@@ -4,10 +4,11 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.2 - 2026-06-17
+
 ### Changed
 - The widget countdown now behaves like a true ephemeral banner again: it hides when the timer expires instead of auto-refreshing indefinitely.
 - Expanded headline categorization so more stories get specific emoji coverage, with a friendlier news-style fallback for uncategorized headlines.
-
 
 ## 1.1.1 - 2026-06-17
 
