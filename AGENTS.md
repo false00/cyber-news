@@ -1,58 +1,131 @@
-# `@false00/cyber-news`
+# `@false00/cyber-news` maintainer guide
 
-Interactive cybersecurity news extension for the Pi coding agent — aggregates live feeds from 14 industry sources and provides deep-dive research prompts.
+This file is the operating manual for agents and maintainers working on `@false00/cyber-news`.
 
-## Project structure
+## Mission
 
-- `dist/` — compiled JavaScript output (entry: `dist/index.js`)
-- Source is TypeScript in `index.ts`
-- `tests/` — unit and package-structure tests run with Node's built-in test runner
+Keep this package readable, honest, and dependable inside the Pi TUI.
+
+The package exists to give Pi users a small, trustworthy cybersecurity news briefing surface with predictable widget behavior, accurate documentation, and conservative release practices.
+
+## Repository map
+
+- `index.ts` — TypeScript source of truth for the extension
+- `dist/index.js` — compiled default-exported Pi extension entrypoint
+- `dist/index.d.ts` — published type declarations
+- `tests/news.test.ts` — feed parsing, source matching, and widget-width formatting checks
+- `tests/package.test.ts` — package metadata and trust-signal structure checks
 - `docs/COMPATIBILITY.md` — maintained compatibility notes
-- `tsconfig.json` controls the build
+- `.github/` — CI workflow and repository automation
+- `README.md` — user-facing package documentation
+- `CONTRIBUTING.md` — contributor workflow
+- `SECURITY.md` — security and disclosure policy
+- `CHANGELOG.md` — release history
 
-## Key conventions
+## Project facts
 
-- **Default export** in `dist/index.js` — the extension function registered with Pi
-- **Command naming** — all commands are prefixed `cyber_`
-- **Widget key** — `"cyber-news"`
-- **State persistence** — source enable/disable state is persisted via Pi custom entries under `cyber-news-config`
-- **Session restoration** — source state is restored on `session_start` and `session_tree`
-- **Session cleanup** — timers and widget state are torn down on `session_shutdown`
-- **Source matching** — `/cyber_enable` and `/cyber_disable` accept exact or partial source names
-- **Source manager** — `/cyber_sources` opens an interactive manager in TUI mode and falls back to a status list elsewhere
-- **Multi-source fetching** — feeds are fetched in parallel with `Promise.allSettled`; individual source failures are swallowed
-- **Widget rendering** — render against Pi's provided widget width, not `process.stdout.columns`
-- **Cache fallback** — if a refresh returns no items, the last good headlines remain visible
-- **Item type** — `NewsItem { title, icon, weight, source }` where lower `weight` means higher priority
+- The project is **TypeScript**.
+- `dist/` is **committed directly**.
+- The package is intended for **Pi package installation via npm**.
+- The extension entrypoint must remain registered in `package.json` under `pi.extensions`.
+- The project intentionally **does not register custom LLM tools**; it adds commands, a widget, and lifecycle behavior only.
+- The current Node.js floor is **20+**.
 
-## Documentation rules
+## Pi package conventions
 
-Documentation must match code. When changing a command, parameter, or behavior, update all relevant places:
+Follow current Pi package guidance:
+
+- Keep the `pi-package` keyword in `package.json`.
+- Preserve `pi.extensions` so Pi can load the package root directly.
+- If package metadata changes, make sure `npm pack --dry-run` still includes the intended runtime files and top-level docs.
+- Use Pi session custom entries for branch-aware persistence instead of ad hoc local files.
+- Render widgets against Pi's provided widget width, not guessed terminal width.
+
+## Coding standards
+
+- Prefer small, explicit helpers over clever abstractions.
+- Keep command descriptions concise and agent-readable.
+- Preserve stable command names; all commands must remain prefixed with `cyber_`.
+- Do not present inferred threat details as confirmed facts.
+- Never fabricate feed reliability, upstream source behavior, or Pi runtime behavior.
+- Keep the package narrow in scope; resist turning it into a general-purpose threat-intel platform unless the repo is intentionally redesigned for that.
+
+## Runtime guarantees
+
+Maintain these behavioral guarantees:
+
+- `/cyber_menu`, `/cyber_refresh`, `/cyber_sources`, `/cyber_enable`, and `/cyber_disable` remain the public command surface.
+- `/cyber_enable` and `/cyber_disable` continue to support exact or partial source-name matching.
+- `/cyber_sources` remains interactive in TUI mode and falls back to plain status output outside TUI mode.
+- Widget rendering stays width-aware and must not depend on `process.stdout.columns`.
+- Widget refresh should remain resilient: if a refresh returns no headlines, the last good widget state stays visible.
+- Source enable/disable state must remain branch-aware through Pi custom session entries.
+- Selecting a story for deep-dive research should continue to inject a hidden Pi message rather than exposing raw internal prompt text to the user by default.
+- Timers and widget state must be cleaned up on `session_shutdown`.
+
+## Documentation policy
+
+Documentation must match code.
+
+Whenever you change a command, default, widget behavior, source list, or persistence behavior, update all affected docs:
 
 1. Command `description` strings in `index.ts`
 2. `README.md`
-3. `AGENTS.md`
-4. `CHANGELOG.md` when the shipped behavior changed
+3. `AGENTS.md` if maintainer or agent expectations changed
+4. `CHANGELOG.md` when shipped behavior changed
+5. `CONTRIBUTING.md` or `SECURITY.md` if contributor or trust processes changed
 
-## Project quirks
+Before finishing, grep for stale references:
 
-- `dist/` is committed — always rebuild before finishing
-- The project intentionally does **not** register custom LLM tools; it only adds commands, UI, and lifecycle behavior
-- The package should stay honest about limitations. Do not claim feed reliability, accuracy, or compatibility that has not been verified
+- old command descriptions
+- outdated source counts
+- outdated Node.js requirements
+- outdated widget behavior
+- removed or renamed files
 
-## Commit & publish policy
+## Testing policy
 
-- Never commit without explicit user approval
-- Never push or publish without explicit user approval
+Every code change should be backed by tests appropriate to the behavior being touched.
 
-### Publishing workflow
+Current suites:
 
-When the user asks to publish:
+- `tests/news.test.ts` — feed parsing, source matching, and widget formatting behavior
+- `tests/package.test.ts` — package metadata, published file expectations, and README command coverage
 
-1. Check the current npm version in `package.json`
-2. Check the latest git tag — it should match `v{version}`
-3. If the version changed and the tag does not match, create the matching tag
-4. Run `npm pack --dry-run`
-5. Use `npm version patch|minor|major` for version bumps instead of editing `package.json` manually
-6. Run `npm publish`
-7. If 2FA is enabled, complete the npm browser/device auth flow when prompted
+Expectations:
+
+- Run `npm test` before considering work complete.
+- Run `npm pack --dry-run` when packaging or metadata changes.
+- New parsing or formatting behavior should include both success-path and edge-case coverage where practical.
+- User-facing packaging or documentation changes should include a structural or metadata check when feasible.
+- Keep the test suite non-network by default unless the project explicitly decides to add live-feed validation later.
+
+## Security and trust posture
+
+Treat this package as user-facing runtime software, not a throwaway demo.
+
+- Do not add hidden telemetry.
+- Do not add credential handling unless it is explicitly documented and justified.
+- Do not log secrets, cookies, or private tokens in code, docs, or tests.
+- Prefer explicit limitations over vague marketing language.
+- If a behavior is uncertain, say so and inspect the code or upstream feed instead of guessing.
+
+## Release discipline
+
+- Never commit without explicit user approval.
+- Never push or publish without explicit user approval.
+- Do not skip npm versions.
+- Dry-run with `npm pack --dry-run` before publish.
+- Keep tags aligned with `package.json` versions.
+- If npm browser auth / 2FA interrupts publish flow, tell the user plainly and let them complete the auth flow rather than pretending publish succeeded.
+
+## Release checklist
+
+When asked to prepare a release:
+
+1. Run `npm test`
+2. Run `npm pack --dry-run`
+3. Verify `package.json` metadata is current
+4. Verify `README.md` and `AGENTS.md` reflect shipped behavior
+5. Check whether the current version is already published before bumping
+6. Only commit, tag, push, or publish with explicit user approval

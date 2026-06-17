@@ -4,6 +4,9 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+### Changed
+- Refined `README.md` and `AGENTS.md` again after reviewing the structure used in `../pi-proxmox`, adding clearer design-philosophy, stability, quick-start, repository-map, runtime-guarantee, and release-checklist guidance.
+
 ## 1.1.0 - 2026-06-17
 
 ### Added

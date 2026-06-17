@@ -30,8 +30,31 @@ What it does well:
 - **Deep-dive handoff** — `/cyber_menu` queues a focused research prompt for a selected headline
 - **Session-aware state** — enabled source choices persist in the session branch through Pi custom entries
 - **Graceful refresh behavior** — the widget auto-refreshes every minute and keeps the last good headlines when a refresh comes back empty
+- **Pi-native packaging** — installable through npm as a normal Pi package
 
-## Trust model and operating behavior
+## Design philosophy
+
+This package is intentionally a **small, TUI-native news briefing extension** for Pi.
+
+That means:
+
+- it focuses on concise headline discovery rather than becoming a full threat-intelligence platform
+- it favors predictable rendering over dense layouts that look impressive but break in real terminals
+- it keeps persistence lightweight and session-local instead of introducing separate config files
+- it tries to be explicit about what is confirmed versus what Pi may infer during a deep-dive follow-up
+
+## Stability guarantees
+
+This repository aims to provide a stable lightweight automation surface for Pi users.
+
+Current guarantees:
+
+- published command names are treated as stable once released
+- the widget remains width-aware and should not guess based on full terminal width
+- source state persists through Pi session custom entries rather than undocumented local files
+- the public behavior stays command-driven; the package does not currently expose custom Pi tools
+
+## Trust, safety, and operating model
 
 This extension is intentionally narrow in scope.
 
@@ -42,12 +65,14 @@ Important expectations:
 - It **does not require API keys, secrets, or local config files**
 - Choosing a story from `/cyber_menu` sends a hidden user-style message into Pi to trigger a research turn
 - Source enable/disable state is persisted in the current Pi session branch via custom session entries
+- Deep-dive output quality depends on the current model and the available public reporting behind the selected headline
 
 If you are evaluating the package for team or long-term use, review:
 
 - [AGENTS.md](AGENTS.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [SECURITY.md](SECURITY.md)
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 - [tests/](tests/)
 
 ## Install
@@ -58,10 +83,36 @@ Install into Pi as a package:
 pi install npm:@false00/cyber-news
 ```
 
+Use it for a single run without changing your settings:
+
+```bash
+pi -e npm:@false00/cyber-news
+```
+
 Run it from this repository during local development:
 
 ```bash
 pi -e .
+```
+
+## Quick start
+
+A typical flow:
+
+```text
+/cyber_sources
+/cyber_enable sophos
+/cyber_refresh
+/cyber_menu
+```
+
+You can also ask Pi to help operate the extension in plain English, for example:
+
+```text
+Enable SANS ISC in the cyber-news extension
+Refresh the cyber-news widget
+Open the cyber-news headline menu
+Disable Troy Hunt in the cyber-news extension
 ```
 
 ## Commands
@@ -167,6 +218,18 @@ npm publish
 ```
 
 Versioning and release discipline live in [AGENTS.md](AGENTS.md).
+
+## Support and feedback
+
+When reporting problems, include the package version, Pi version, command used, and source name if relevant.
+
+## See also
+
+- [AGENTS.md](AGENTS.md) — maintainer and agent guidance
+- [CHANGELOG.md](CHANGELOG.md) — release history
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor workflow
+- [SECURITY.md](SECURITY.md) — security policy
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) — compatibility notes
 
 ## License
 
