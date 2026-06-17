@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 interface NewsItem {
   title: string;
@@ -10,20 +10,31 @@ interface NewsItem {
 interface RssSource {
   name: string;
   url: string;
-  lang: string;
   enabled: boolean;
 }
 
-const NEWS_TITLE = "🛡️ Cyber Briefing";
-const GRN = "\x1b[32m";
-const TEA = "\x1b[36m";
-const RST = "\x1b[0m";
-const MIN_W = 48;
-const MAX_WIDGET_ROWS = 6;
+interface SourceState {
+  enabledSources: string[];
+}
+
+interface WidgetTheme {
+  fg(color: string, text: string): string;
+  bold(text: string): string;
+}
+
+const NEWS_TITLE = "Cyber Briefing";
+const SOURCE_STATE_ENTRY = "cyber-news-config";
+const DEFAULT_ENABLED_SOURCE_NAMES = new Set([
+  "BleepingComputer",
+  "The Hacker News",
+  "Krebs on Security",
+]);
+const MIN_WIDGET_WIDTH = 32;
+const MAX_WIDGET_ITEMS = 6;
 const MAX_MENU_ITEMS = 30;
 const ITEMS_PER_SOURCE = 3;
-const FETCH_TIMEOUT = 10000;
-const WIDGET_DURATION = 60000;
+const FETCH_TIMEOUT_MS = 10_000;
+const AUTO_REFRESH_MS = 60_000;
 const SPINNER_CHARS = ["◐", "◓", "◑", "◒"];
 
 let tickCount = 0;
@@ -31,22 +42,24 @@ let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let widgetStartTime = 0;
 let cachedHeadlines: NewsItem[] = [];
 let cachedEnabledCount = 0;
+let lastRefreshUsedCache = false;
+let isRefreshing = false;
 
 const SOURCES: RssSource[] = [
-  { name: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/", lang: "en", enabled: true },
-  { name: "The Hacker News", url: "https://feeds.feedburner.com/TheHackersNews?format=xml", lang: "en", enabled: true },
-  { name: "Krebs on Security", url: "https://krebsonsecurity.com/feed/", lang: "en", enabled: true },
-  { name: "WeLiveSecurity", url: "https://feeds.feedburner.com/eset/blog", lang: "en", enabled: false },
-  { name: "Graham Cluley", url: "https://grahamcluley.com/feed/", lang: "en", enabled: false },
-  { name: "Securelist", url: "https://securelist.com/feed/", lang: "en", enabled: false },
-  { name: "Darknet Diaries", url: "https://podcast.darknetdiaries.com/", lang: "en", enabled: false },
-  { name: "SANS ISC", url: "https://isc.sans.edu/rssfeed_full.xml", lang: "en", enabled: false },
-  { name: "Schneier on Security", url: "https://www.schneier.com/feed/atom/", lang: "en", enabled: false },
-  { name: "Sophos Security Ops", url: "https://news.sophos.com/en-us/category/security-operations/feed/", lang: "en", enabled: false },
-  { name: "Sophos Threat Research", url: "https://news.sophos.com/en-us/category/threat-research/feed/", lang: "en", enabled: false },
-  { name: "Troy Hunt", url: "https://www.troyhunt.com/rss/", lang: "en", enabled: false },
-  { name: "USOM Threats", url: "https://www.usom.gov.tr/rss/tehdit.rss", lang: "tr", enabled: false },
-  { name: "USOM Announcements", url: "https://www.usom.gov.tr/rss/duyuru.rss", lang: "tr", enabled: false },
+  { name: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/", enabled: true },
+  { name: "The Hacker News", url: "https://feeds.feedburner.com/TheHackersNews?format=xml", enabled: true },
+  { name: "Krebs on Security", url: "https://krebsonsecurity.com/feed/", enabled: true },
+  { name: "WeLiveSecurity", url: "https://feeds.feedburner.com/eset/blog", enabled: false },
+  { name: "Graham Cluley", url: "https://grahamcluley.com/feed/", enabled: false },
+  { name: "Securelist", url: "https://securelist.com/feed/", enabled: false },
+  { name: "Darknet Diaries", url: "https://podcast.darknetdiaries.com/", enabled: false },
+  { name: "SANS ISC", url: "https://isc.sans.edu/rssfeed_full.xml", enabled: false },
+  { name: "Schneier on Security", url: "https://www.schneier.com/feed/atom/", enabled: false },
+  { name: "Sophos Security Ops", url: "https://news.sophos.com/en-us/category/security-operations/feed/", enabled: false },
+  { name: "Sophos Threat Research", url: "https://news.sophos.com/en-us/category/threat-research/feed/", enabled: false },
+  { name: "Troy Hunt", url: "https://www.troyhunt.com/rss/", enabled: false },
+  { name: "USOM Threats", url: "https://www.usom.gov.tr/rss/tehdit.rss", enabled: false },
+  { name: "USOM Announcements", url: "https://www.usom.gov.tr/rss/duyuru.rss", enabled: false },
 ];
 
 const CATEGORIES = [
@@ -92,50 +105,142 @@ const CATEGORIES = [
 
 function decodeEntities(text: string): string {
   return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&#x27;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c));
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_match, decimal) => String.fromCodePoint(Number(decimal)));
+}
+
+function stripTags(text: string): string {
+  return text.replace(/<[^>]+>/g, " ");
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+export function extractFeedTitles(xml: string): string[] {
+  const titles: string[] = [];
+  const blockRegex = /<(item|entry)\b[\s\S]*?<\/\1>/gi;
+  const blocks = xml.match(blockRegex) ?? [];
+
+  for (const block of blocks) {
+    const match = block.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+    if (!match) continue;
+
+    const raw = match[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1") ?? "";
+    const title = decodeEntities(stripTags(raw)).replace(/\s+/g, " ").trim();
+    if (title) {
+      titles.push(title);
+    }
+  }
+
+  if (titles.length > 0) {
+    return titles;
+  }
+
+  const fallback: string[] = [];
+  const titleRegex = /<title\b[^>]*>([\s\S]*?)<\/title>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = titleRegex.exec(xml)) !== null) {
+    const raw = match[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1") ?? "";
+    const title = decodeEntities(stripTags(raw)).replace(/\s+/g, " ").trim();
+    if (title) {
+      fallback.push(title);
+    }
+  }
+  return fallback;
 }
 
 function categorize(title: string): { icon: string; weight: number } {
   const lower = title.toLowerCase();
-  for (const cat of CATEGORIES) {
-    if (cat.keywords.some(k => lower.includes(k))) {
-      return { icon: cat.icon, weight: cat.weight };
+  for (const category of CATEGORIES) {
+    if (category.keywords.some((keyword) => lower.includes(keyword))) {
+      return { icon: category.icon, weight: category.weight };
     }
   }
   return { icon: "🔹", weight: 99 };
 }
 
 function enabledSources(): RssSource[] {
-  return SOURCES.filter(s => s.enabled);
+  return SOURCES.filter((source) => source.enabled);
 }
 
-async function fetchSource(src: RssSource): Promise<NewsItem[]> {
+function sourceIcon(source: RssSource): string {
+  const icons: Record<string, string> = {
+    BleepingComputer: "💻",
+    "Darknet Diaries": "🎙️",
+    "Graham Cluley": "🐦",
+    "Krebs on Security": "🔍",
+    "SANS ISC": "🌐",
+    "Schneier on Security": "🔐",
+    Securelist: "🛡️",
+    "Sophos Security Ops": "🛡️",
+    "Sophos Threat Research": "🔬",
+    "The Hacker News": "📰",
+    "Troy Hunt": "🔑",
+    "USOM Announcements": "📢",
+    "USOM Threats": "🌍",
+    WeLiveSecurity: "🦠",
+  };
+  return icons[source.name] ?? "📡";
+}
+
+function sourceOptionLabel(source: RssSource): string {
+  const status = source.enabled ? "✅" : "❌";
+  return `${status} ${sourceIcon(source)} ${source.name}`;
+}
+
+function resolveSourceMatches(query: string): RssSource[] {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return [];
+
+  const exactMatches = SOURCES.filter((source) => normalizeText(source.name) === normalizedQuery);
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  return SOURCES
+    .filter((source) => normalizeText(source.name).includes(normalizedQuery))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+async function fetchSource(source: RssSource): Promise<NewsItem[]> {
   try {
-    const response = await fetch(src.url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+    const response = await fetch(source.url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!response.ok) return [];
-    const text = await response.text();
-    const regex = /<title>(.*?)<\/title>/g;
+
+    const xml = await response.text();
+    const titles = extractFeedTitles(xml);
     const items: NewsItem[] = [];
     const seen = new Set<string>();
-    let match;
-    while ((match = regex.exec(text)) !== null) {
+
+    for (const candidate of titles) {
       if (items.length >= ITEMS_PER_SOURCE) break;
-      const raw = match[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-      const title = decodeEntities(raw);
+
+      const title = candidate.replace(/\s+/g, " ").trim();
       const key = title.toLowerCase();
       if (!title || title.length < 6 || seen.has(key)) continue;
+      if (key.startsWith("rss feed") || key === source.name.toLowerCase()) continue;
+
       seen.add(key);
-      if (key.startsWith('rss feed') || key === src.name.toLowerCase()) continue;
       const { icon, weight } = categorize(title);
-      items.push({ title, icon, weight, source: src.name });
+      items.push({ title, icon, weight, source: source.name });
     }
+
     return items;
   } catch {
     return [];
@@ -143,280 +248,423 @@ async function fetchSource(src: RssSource): Promise<NewsItem[]> {
 }
 
 async function fetchAllNews(): Promise<NewsItem[]> {
-  const active = enabledSources();
-  if (active.length === 0) return [];
-  const results = await Promise.allSettled(active.map(s => fetchSource(s)));
+  const activeSources = enabledSources();
+  if (activeSources.length === 0) return [];
+
+  const results = await Promise.allSettled(activeSources.map((source) => fetchSource(source)));
   const allItems: NewsItem[] = [];
   const seen = new Set<string>();
-  for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
-    for (const item of r.value) {
-      const key = item.title.toLowerCase().slice(0, 80);
-      if (!seen.has(key)) {
-        seen.add(key);
-        allItems.push(item);
-      }
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+
+    for (const item of result.value) {
+      const key = item.title.toLowerCase().slice(0, 120);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      allItems.push(item);
     }
   }
-  return allItems.sort((a, b) => a.weight - b.weight);
+
+  return allItems.sort((left, right) => left.weight - right.weight || left.source.localeCompare(right.source));
 }
 
-function visualLen(s: string): number {
-  let len = 0;
-  for (const ch of s) {
-    len += ch.codePointAt(0)! > 0xFFFF ? 2 : 1;
+function visibleWidth(text: string): number {
+  const plain = stripAnsi(text);
+  let width = 0;
+  for (const char of plain) {
+    width += char.codePointAt(0)! > 0xFFFF ? 2 : 1;
   }
-  return len;
+  return width;
 }
 
-function col(s: string, w: number): string {
-  const vlen = visualLen(s);
-  if (vlen <= w) return s + " ".repeat(w - vlen);
+function truncatePlain(text: string, width: number): string {
+  if (width <= 0) return "";
+  if (visibleWidth(text) <= width) return text;
+  if (width === 1) return "…";
+
   let result = "";
-  let cur = 0;
-  for (const ch of s) {
-    const cw = ch.codePointAt(0)! > 0xFFFF ? 2 : 1;
-    if (cur + cw > w - 1) break;
-    result += ch;
-    cur += cw;
+  let used = 0;
+  for (const char of text) {
+    const charWidth = char.codePointAt(0)! > 0xFFFF ? 2 : 1;
+    if (used + charWidth > width - 1) break;
+    result += char;
+    used += charWidth;
   }
-  return result + "…";
+  return `${result}…`;
 }
 
-function buildCountdownBar(remaining: number, w: number): string {
-  const totalBars = 10;
-  const ratio = Math.max(0, Math.min(1, remaining / WIDGET_DURATION));
-  const filled = Math.round(ratio * totalBars);
-  const bar = "█".repeat(filled) + "░".repeat(totalBars - filled);
-  const secs = Math.ceil(remaining / 1000);
+function centerPlain(text: string, width: number): string {
+  const plain = truncatePlain(text, width);
+  const remaining = Math.max(0, width - visibleWidth(plain));
+  const left = Math.floor(remaining / 2);
+  const right = remaining - left;
+  return `${" ".repeat(left)}${plain}${" ".repeat(right)}`;
+}
+
+function buildHeadlineLine(item: NewsItem, width: number, theme: WidgetTheme): string {
+  const prefix = `${item.icon} `;
+  const suffixPlain = ` · ${item.source}`;
+  const titleWidth = Math.max(10, width - visibleWidth(prefix) - visibleWidth(suffixPlain));
+  const title = truncatePlain(item.title, titleWidth);
+  return `${prefix}${title}${theme.fg("muted", suffixPlain)}`;
+}
+
+function buildRefreshLine(width: number, remainingMs: number, theme: WidgetTheme): string {
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const spinner = SPINNER_CHARS[tickCount % SPINNER_CHARS.length];
-  const visible = `[${bar}] ${secs}s ${spinner}`;
-  const leftPad = Math.floor((w - visible.length) / 2);
-  return " ".repeat(leftPad) + GRN + visible + RST;
+  return theme.fg("success", centerPlain(`${spinner} refresh in ${seconds}s`, width));
 }
 
-function pairedLines(items: { icon: string; title: string; source: string }[], rows: number, colW: number): string[] {
-  const lines: string[] = [];
-  for (let i = 0; i < rows * 2 && i < items.length; i += 2) {
-    const leftText = `${items[i].icon} ${items[i].title} · ${items[i].source}`;
-    const left = col(leftText, colW);
-    const rightItem = i + 1 < items.length ? items[i + 1] : null;
-    const rightText = rightItem ? `${rightItem.icon} ${rightItem.title} · ${rightItem.source}` : "";
-    const right = rightItem ? col(rightText, colW) : " ".repeat(colW);
-    lines.push(`${left} | ${right}`);
+function buildWidgetLines(
+  width: number,
+  theme: WidgetTheme,
+  items: NewsItem[],
+  enabledCount: number,
+  totalSources: number,
+  remainingMs: number,
+  usedCache: boolean,
+): string[] {
+  const safeWidth = Math.max(MIN_WIDGET_WIDTH, width);
+  const subtitle = usedCache
+    ? `${enabledCount}/${totalSources} sources enabled • showing cached headlines`
+    : `${enabledCount}/${totalSources} sources enabled`;
+
+  const lines = [
+    theme.fg("accent", theme.bold(centerPlain("CYBER NEWS", safeWidth))),
+    theme.fg("dim", centerPlain(subtitle, safeWidth)),
+    "",
+  ];
+
+  if (items.length === 0) {
+    lines.push(theme.fg("warning", truncatePlain("No headlines fetched from enabled sources yet.", safeWidth)));
+  } else {
+    for (const item of items.slice(0, MAX_WIDGET_ITEMS)) {
+      lines.push(buildHeadlineLine(item, safeWidth, theme));
+    }
   }
+
+  lines.push(theme.fg("dim", truncatePlain("Use /cyber_menu for a deep dive • /cyber_sources to manage", safeWidth)));
+  lines.push(buildRefreshLine(safeWidth, remainingMs, theme));
+
   return lines;
 }
 
-function stopCountdown() {
+function stopCountdown(): void {
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
   }
 }
 
-async function renderWidget(ctx: any) {
-  const tw = Math.max(MIN_W, process.stdout?.columns ?? 80);
-  const colW = Math.floor((tw - 3) / 2);
-  const elapsed = Date.now() - widgetStartTime;
-  const remaining = Math.max(0, WIDGET_DURATION - elapsed);
-  const title = "CYBER NEWS";
-  const leftPad = Math.floor((tw - title.length) / 2);
-  const content = [
-    " ".repeat(leftPad) + TEA + title + RST,
-    ...pairedLines(cachedHeadlines, MAX_WIDGET_ROWS, colW),
-    "",
-    buildCountdownBar(remaining, tw),
-  ];
-  await ctx.ui.setWidget("cyber-news", content);
+function renderWidget(ctx: ExtensionContext): void {
+  if (!ctx?.ui) return;
+
+  const remainingMs = Math.max(0, AUTO_REFRESH_MS - (Date.now() - widgetStartTime));
+  ctx.ui.setWidget("cyber-news", (_tui, theme) => ({
+    render(width: number): string[] {
+      return buildWidgetLines(width, theme as WidgetTheme, cachedHeadlines, cachedEnabledCount, SOURCES.length, remainingMs, lastRefreshUsedCache);
+    },
+    invalidate(): void {},
+  }));
 }
 
-async function updateHeaderWidget(ctx: any) {
+async function clearHeaderWidget(ctx: ExtensionContext): Promise<void> {
   if (!ctx?.ui) return;
+  stopCountdown();
+  ctx.ui.setWidget("cyber-news", undefined);
+}
+
+async function updateHeaderWidget(ctx: ExtensionContext): Promise<void> {
+  if (!ctx?.ui || isRefreshing) return;
+
+  isRefreshing = true;
+  stopCountdown();
+
   try {
-    cachedHeadlines = await fetchAllNews();
+    const headlines = await fetchAllNews();
     cachedEnabledCount = enabledSources().length;
+    lastRefreshUsedCache = headlines.length === 0 && cachedHeadlines.length > 0;
+    if (headlines.length > 0 || cachedHeadlines.length === 0) {
+      cachedHeadlines = headlines;
+    }
+
     widgetStartTime = Date.now();
     tickCount = 0;
-    stopCountdown();
-    await renderWidget(ctx);
-    countdownInterval = setInterval(async () => {
-      tickCount++;
-      const elapsed = Date.now() - widgetStartTime;
-      const remaining = WIDGET_DURATION - elapsed;
-      if (remaining <= 0) {
-        stopCountdown();
-        await clearHeaderWidget(ctx);
+    renderWidget(ctx);
+
+    countdownInterval = setInterval(() => {
+      tickCount += 1;
+      const remainingMs = AUTO_REFRESH_MS - (Date.now() - widgetStartTime);
+      if (remainingMs <= 0) {
+        void updateHeaderWidget(ctx);
         return;
       }
-      await renderWidget(ctx);
+      renderWidget(ctx);
     }, 1000);
-  } catch (e) {
-    console.error("[Cyber News] Widget update failed:", e);
+  } catch (error) {
+    console.error("[Cyber News] Widget update failed:", error);
+    widgetStartTime = Date.now();
+    cachedEnabledCount = enabledSources().length;
+    renderWidget(ctx);
+  } finally {
+    isRefreshing = false;
   }
 }
 
-async function clearHeaderWidget(ctx: any) {
-  if (!ctx?.ui) return;
-  stopCountdown();
-  await ctx.ui.setWidget("cyber-news", []);
-}
+export const __testing = {
+  extractFeedTitles,
+  resolveSourceQuery(query: string): string[] {
+    return resolveSourceMatches(query).map((source) => source.name);
+  },
+  buildWidgetPreview(width: number, items: NewsItem[], enabledCount: number, totalSources: number, remainingMs: number): string[] {
+    const plainTheme: WidgetTheme = {
+      fg(_color: string, text: string): string {
+        return text;
+      },
+      bold(text: string): string {
+        return text;
+      },
+    };
+    return buildWidgetLines(width, plainTheme, items, enabledCount, totalSources, remainingMs, false);
+  },
+};
 
-function sourceColor(name: string): string {
-  const map: Record<string, string> = {
-    "BleepingComputer": "\x1b[31m",
-    "The Hacker News": "\x1b[32m",
-    "Krebs on Security": "\x1b[33m",
-    "WeLiveSecurity": "\x1b[34m",
-    "Graham Cluley": "\x1b[35m",
-    "Securelist": "\x1b[36m",
-    "Darknet Diaries": "\x1b[91m",
-    "SANS ISC": "\x1b[92m",
-    "Schneier on Security": "\x1b[93m",
-    "Sophos Security Ops": "\x1b[94m",
-    "Sophos Threat Research": "\x1b[95m",
-    "Troy Hunt": "\x1b[96m",
-    "USOM Threats": "\x1b[37m",
-    "USOM Announcements": "\x1b[97m",
-  };
-  return map[name] ?? "";
-}
+export default async function cyberNewsExtension(pi: ExtensionAPI) {
+  function resetSourcesToDefaults(): void {
+    for (const source of SOURCES) {
+      source.enabled = DEFAULT_ENABLED_SOURCE_NAMES.has(source.name);
+    }
+  }
 
-function sourceIcon(src: RssSource): string {
-  const icons: Record<string, string> = {
-    "BleepingComputer": "💻",
-    "Darknet Diaries": "🎙️",
-    "Graham Cluley": "🐦",
-    "Krebs on Security": "🔍",
-    "SANS ISC": "🌐",
-    "Schneier on Security": "🔐",
-    "Securelist": "🛡️",
-    "Sophos Security Ops": "🛡️",
-    "The Hacker News": "📰",
-    "Sophos Threat Research": "🔬",
-    "Troy Hunt": "🔑",
-    "USOM Threats": "🌍",
-    "USOM Announcements": "📢",
-    "WeLiveSecurity": "🦠",
-  };
-  return icons[src.name] || "📡";
-}
+  function persistSourceState(): void {
+    pi.appendEntry<SourceState>(SOURCE_STATE_ENTRY, {
+      enabledSources: enabledSources().map((source) => source.name),
+    });
+  }
 
-export default async function (pi: ExtensionAPI) {
+  function restoreSourceState(ctx: ExtensionContext): void {
+    resetSourcesToDefaults();
 
-  async function performDeepDive(headline: string, ctx: any) {
-    if (!ctx?.ui) return;
-    ctx.ui.notify("Summarizing...", "info");
+    let savedState: SourceState | undefined;
+    for (const entry of ctx.sessionManager.getBranch()) {
+      if (entry.type === "custom" && entry.customType === SOURCE_STATE_ENTRY) {
+        savedState = entry.data as SourceState | undefined;
+      }
+    }
+
+    if (!savedState?.enabledSources?.length) {
+      cachedEnabledCount = enabledSources().length;
+      return;
+    }
+
+    const enabled = new Set(savedState.enabledSources);
+    for (const source of SOURCES) {
+      source.enabled = enabled.has(source.name);
+    }
+
+    if (enabledSources().length === 0) {
+      resetSourcesToDefaults();
+    }
+
+    cachedEnabledCount = enabledSources().length;
+  }
+
+  async function chooseSourceFromMatches(
+    query: string,
+    matches: RssSource[],
+    ctx: ExtensionContext,
+  ): Promise<RssSource | undefined> {
+    if (matches.length === 0) return undefined;
+    if (matches.length === 1) return matches[0];
+
+    const labels = matches.map((source) => sourceOptionLabel(source));
+    if (ctx.mode === "tui") {
+      const picked = await ctx.ui.select(`Multiple sources match "${query}"`, labels);
+      if (typeof picked !== "string") return undefined;
+      return matches.find((source) => sourceOptionLabel(source) === picked);
+    }
+
+    ctx.ui.notify(`Multiple sources match "${query}": ${matches.map((source) => source.name).join(", ")}`, "warning");
+    return undefined;
+  }
+
+  async function resolveSource(query: string, ctx: ExtensionContext): Promise<RssSource | undefined> {
+    const matches = resolveSourceMatches(query);
+    if (matches.length === 0) {
+      ctx.ui.notify(`Source "${query}" not found. Use /cyber_sources to list all sources.`, "error");
+      return undefined;
+    }
+    return chooseSourceFromMatches(query, matches, ctx);
+  }
+
+  async function setSourceEnabled(source: RssSource, enabled: boolean, ctx: ExtensionContext): Promise<boolean> {
+    if (enabled && source.enabled) {
+      ctx.ui.notify(`${source.name} is already enabled.`, "info");
+      return false;
+    }
+
+    if (!enabled && !source.enabled) {
+      ctx.ui.notify(`${source.name} is already disabled.`, "info");
+      return false;
+    }
+
+    if (!enabled && enabledSources().length <= 1) {
+      ctx.ui.notify("Cannot disable the last enabled source. Enable another source first.", "warning");
+      return false;
+    }
+
+    source.enabled = enabled;
+    persistSourceState();
+    await updateHeaderWidget(ctx);
+    ctx.ui.notify(`${enabled ? "Enabled" : "Disabled"} ${source.name}.`, "info");
+    return true;
+  }
+
+  function notifySourceList(ctx: ExtensionContext): void {
+    const lines = SOURCES.map((source) => `  ${sourceOptionLabel(source)}`);
+    const active = enabledSources().length;
+    ctx.ui.notify(`Sources (${active}/${SOURCES.length} enabled):\n${lines.join("\n")}`, "info");
+  }
+
+  async function openSourceManager(ctx: ExtensionContext): Promise<void> {
+    if (ctx.mode !== "tui") {
+      notifySourceList(ctx);
+      return;
+    }
+
+    while (true) {
+      const doneLabel = `Done (${enabledSources().length}/${SOURCES.length} enabled)`;
+      const options = [doneLabel, ...SOURCES.map((source) => sourceOptionLabel(source))];
+      const selected = await ctx.ui.select(NEWS_TITLE, options);
+
+      if (typeof selected !== "string" || selected === doneLabel) {
+        break;
+      }
+
+      const source = SOURCES.find((candidate) => sourceOptionLabel(candidate) === selected);
+      if (!source) continue;
+      await setSourceEnabled(source, !source.enabled, ctx);
+    }
+
+    ctx.ui.notify(`Source manager closed. ${enabledSources().length}/${SOURCES.length} sources enabled.`, "info");
+  }
+
+  async function performDeepDive(item: NewsItem, ctx: ExtensionContext): Promise<void> {
+    ctx.ui.notify(`Queued deep-dive research for: ${item.title}`, "info");
     await clearHeaderWidget(ctx);
-    pi.sendMessage({
-      customType: "user",
-      content: [{
-        type: "text",
-        text: `Perform a deep-dive research and provide an EXECUTIVE SUMMARY for this headline: "${headline}".\n\nInclude:\n1. **Executive Summary** (Impact/Business logic)\n2. **Technical Details** (Attack mechanism)\n3. **Mitigation** (Immediate steps)`,
-      }],
-      display: false,
-    }, { triggerTurn: true });
+
+    pi.sendMessage(
+      {
+        customType: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              `Perform a deep-dive cybersecurity research brief for this headline from ${item.source}: "${item.title}".\n\n` +
+              `Be explicit about what is confirmed versus inferred.\n\n` +
+              `Include:\n` +
+              `1. Executive Summary\n` +
+              `2. Why It Matters\n` +
+              `3. Technical Details / likely TTPs\n` +
+              `4. Immediate Mitigations\n` +
+              `5. What to Monitor Next`,
+          },
+        ],
+        display: false,
+      },
+      { triggerTurn: true },
+    );
   }
 
   pi.on("session_start", async (_event, ctx) => {
+    restoreSourceState(ctx);
     await updateHeaderWidget(ctx);
-    if (ctx.ui?.notify) {
-      const active = enabledSources().length;
-      const total = SOURCES.length;
-      ctx.ui.notify(`Cyber Briefing active — ${active}/${total} sources enabled. /cyber_menu to pick a story, /cyber_sources to manage sources.`, "info");
-    }
+    ctx.ui.notify(
+      `Cyber Briefing active — ${enabledSources().length}/${SOURCES.length} sources enabled. ` +
+        `Use /cyber_menu to pick a story or /cyber_sources to manage sources.`,
+      "info",
+    );
+  });
+
+  pi.on("session_tree", async (_event, ctx) => {
+    restoreSourceState(ctx);
+    await updateHeaderWidget(ctx);
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    await clearHeaderWidget(ctx);
   });
 
   pi.registerCommand("cyber_menu", {
-    description: "Open interactive menu to select a headline for deep-dive summary.",
+    description: "Open a headline picker for deep-dive research on a story.",
     handler: async (_args, ctx) => {
-      const all = await fetchAllNews();
-      if (all.length === 0) {
-        ctx.ui.notify("No news available. Enable sources with /cyber_enable.", "error");
+      const available = cachedHeadlines.length > 0 ? cachedHeadlines : await fetchAllNews();
+      if (available.length === 0) {
+        ctx.ui.notify("No news available right now. Try /cyber_refresh or enable more sources.", "error");
         return;
       }
-      const top = all.slice(0, MAX_MENU_ITEMS);
-      const options = top.map(item => `${item.icon}  ${item.title}  [${item.source}]`);
+
+      const top = available.slice(0, MAX_MENU_ITEMS);
+      const options = top.map((item) => `${item.icon} ${item.title} [${item.source}]`);
       const selected = await ctx.ui.select(NEWS_TITLE, options);
-      if (typeof selected === 'string') {
-        await clearHeaderWidget(ctx);
-        const stripped = selected.replace(/^.\s\s/, '').replace(/\s+\[.*?\]$/, '');
-        await performDeepDive(stripped, ctx);
-      } else {
+      if (typeof selected !== "string") {
         ctx.ui.notify("Selection cancelled.", "info");
+        return;
       }
+
+      const item = top.find((candidate) => `${candidate.icon} ${candidate.title} [${candidate.source}]` === selected);
+      if (!item) {
+        ctx.ui.notify("Unable to resolve the selected headline.", "error");
+        return;
+      }
+
+      await performDeepDive(item, ctx);
     },
   });
 
   pi.registerCommand("cyber_refresh", {
-    description: "Refresh the cybersecurity header with latest headlines from all enabled sources.",
+    description: "Refresh the widget with the latest headlines from enabled sources.",
     handler: async (_args, ctx) => {
       await updateHeaderWidget(ctx);
-      if (ctx.ui?.notify) {
-        const active = enabledSources().length;
-        ctx.ui.notify(`Refreshed from ${active} sources.`, "info");
-      }
+      ctx.ui.notify(`Refreshed headlines from ${enabledSources().length} enabled sources.`, "info");
     },
   });
 
   pi.registerCommand("cyber_sources", {
-    description: "List all sources with status (✅ enabled / ❌ disabled).",
+    description: "Open the source manager in TUI, or print source status in non-TUI mode.",
     handler: async (_args, ctx) => {
-      const lines = SOURCES.map(s => {
-        const status = s.enabled ? "✅" : "❌";
-        return `  ${status}  ${sourceIcon(s)}  ${sourceColor(s.name)}${s.name}${RST}`;
-      });
-      const active = enabledSources().length;
-      ctx.ui.notify(`Sources (${active}/${SOURCES.length} enabled). Use /cyber_enable or /cyber_disable:\n${lines.join('\n')}`, "info");
+      await openSourceManager(ctx);
     },
   });
 
   pi.registerCommand("cyber_enable", {
-    description: "Enable a source by name. Usage: /cyber_enable <source name>",
+    description: "Enable a source by exact or partial name. Usage: /cyber_enable <source name>",
     handler: async (args, ctx) => {
-      const name = args.trim();
-      if (!name) {
-        ctx.ui.notify("Specify a source name. /cyber_sources to list them.", "warning");
+      const query = args.trim();
+      if (!query) {
+        ctx.ui.notify("Specify a source name. Use /cyber_sources to browse all sources.", "warning");
         return;
       }
-      const src = SOURCES.find(s => s.name.toLowerCase() === name.toLowerCase());
-      if (!src) {
-        ctx.ui.notify(`Source "${name}" not found. Use /cyber_sources to list all.`, "error");
-        return;
-      }
-      if (src.enabled) {
-        ctx.ui.notify(`${src.name} is already enabled.`, "info");
-        return;
-      }
-      src.enabled = true;
-      ctx.ui.notify(`✅ ${sourceColor(src.name)}${src.name}${RST} enabled.`, "info");
+
+      const source = await resolveSource(query, ctx);
+      if (!source) return;
+      await setSourceEnabled(source, true, ctx);
     },
   });
 
   pi.registerCommand("cyber_disable", {
-    description: "Disable a source by name. Usage: /cyber_disable <source name>",
+    description: "Disable a source by exact or partial name. Usage: /cyber_disable <source name>",
     handler: async (args, ctx) => {
-      const name = args.trim();
-      if (!name) {
-        ctx.ui.notify("Specify a source name. /cyber_sources to list them.", "warning");
+      const query = args.trim();
+      if (!query) {
+        ctx.ui.notify("Specify a source name. Use /cyber_sources to browse all sources.", "warning");
         return;
       }
-      const src = SOURCES.find(s => s.name.toLowerCase() === name.toLowerCase());
-      if (!src) {
-        ctx.ui.notify(`Source "${name}" not found. Use /cyber_sources to list all.`, "error");
-        return;
-      }
-      if (!src.enabled) {
-        ctx.ui.notify(`${src.name} is already disabled.`, "info");
-        return;
-      }
-      const activeCount = enabledSources().length;
-      if (activeCount <= 1) {
-        ctx.ui.notify("Cannot disable the last enabled source. Enable another first.", "warning");
-        return;
-      }
-      src.enabled = false;
-      ctx.ui.notify(`❌ ${src.name} disabled.`, "info");
+
+      const source = await resolveSource(query, ctx);
+      if (!source) return;
+      await setSourceEnabled(source, false, ctx);
     },
   });
 }

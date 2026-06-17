@@ -1,14 +1,19 @@
 {
   "name": "@false00/cyber-news",
   "version": "1.0.2",
-  "description": "Adds an interactive cybersecurity news header to the Pi TUI, providing live feeds from BleepingComputer and deep-dive research summaries.",
+  "description": "Interactive cybersecurity news briefing for the Pi coding agent with live multi-source headlines and deep-dive story prompts",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
     "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "README.md",
+    "SECURITY.md",
+    "docs/COMPATIBILITY.md",
     "LICENSE"
   ],
   "exports": {
@@ -20,8 +25,10 @@
   "keywords": [
     "pi-package",
     "pi-extension",
+    "pi-coding-agent",
     "cybersecurity",
     "news",
+    "rss",
     "security",
     "false00"
   ],
@@ -32,7 +39,15 @@
   "author": "false00 <jortega@curl.red>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/false00/cyber-news"
+    "url": "git+https://github.com/false00/cyber-news.git"
+  },
+  "homepage": "https://github.com/false00/cyber-news#readme",
+  "bugs": {
+    "url": "https://github.com/false00/cyber-news/issues"
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
   },
   "publishConfig": {
     "access": "public"
@@ -45,14 +60,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:tools": "node --import tsx --test tests/*.test.ts",
-    "test": "npm run typecheck && npm run build && npm run test:tools",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test": "npm run typecheck && npm run build && npm run test:unit",
     "prepublishOnly": "npm test && npm pack --dry-run"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": ">=0.79.0 <0.80.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.79.6",
     "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
