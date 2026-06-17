@@ -10,6 +10,10 @@ export declare const __testing: {
     extractFeedTitles: typeof extractFeedTitles;
     resolveSourceQuery(query: string): string[];
     buildWidgetPreview(width: number, items: NewsItem[], enabledCount: number, totalSources: number, remainingMs: number): string[];
+    categorizeTitle(title: string): {
+        icon: string;
+        weight: number;
+    };
 };
 export default function cyberNewsExtension(pi: ExtensionAPI): Promise<void>;
 export {};

@@ -72,7 +72,17 @@ test("widget preview lines stay within the requested width", () => {
   );
 
   assert.ok(lines.length > 0);
+  assert.equal(lines.at(-1)?.includes("hides in"), true);
   for (const line of lines) {
     assert.ok(visibleWidth(line) <= 60, `line exceeds width: ${JSON.stringify(line)}`);
   }
+});
+
+test("categorizeTitle covers common headline patterns with specific emoji", () => {
+  assert.equal(__testing.categorizeTitle("Why Account Takeovers Are Rising and How to Stop Them").icon, "👤");
+  assert.equal(__testing.categorizeTitle("India's Telegram ban hit the UAE too. Here's how to get around it").icon, "💬");
+  assert.equal(__testing.categorizeTitle("The Top 10 Attack Surface Exposures in 2026").icon, "🧭");
+  assert.equal(__testing.categorizeTitle("Malicious JetBrains Plugins Steal AI API Keys").icon, "🧩");
+  assert.equal(__testing.categorizeTitle("Completely uncategorized headline example").icon, "📰");
+  assert.notEqual(__testing.categorizeTitle("API security roundup for enterprise developers").icon, "🕵️");
 });

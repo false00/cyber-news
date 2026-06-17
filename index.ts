@@ -34,7 +34,7 @@ const MAX_WIDGET_ITEMS = 6;
 const MAX_MENU_ITEMS = 30;
 const ITEMS_PER_SOURCE = 3;
 const FETCH_TIMEOUT_MS = 10_000;
-const AUTO_REFRESH_MS = 60_000;
+const WIDGET_TTL_MS = 60_000;
 const SPINNER_CHARS = ["◐", "◓", "◑", "◒"];
 
 let tickCount = 0;
@@ -42,7 +42,6 @@ let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let widgetStartTime = 0;
 let cachedHeadlines: NewsItem[] = [];
 let cachedEnabledCount = 0;
-let lastRefreshUsedCache = false;
 let isRefreshing = false;
 
 const SOURCES: RssSource[] = [
@@ -72,35 +71,40 @@ const CATEGORIES = [
   { icon: "🕵️", weight: 7, keywords: ["apt", "state-sponsored", "advanced persistent", "threat group", "nation-state", "intelligence", "espionage", "spy", "covert", "infiltration", "adversary", "cyberespionage"] },
   { icon: "🌊", weight: 8, keywords: ["ddos", "denial of service", "amplification", "flood"] },
   { icon: "🔗", weight: 9, keywords: ["supply chain", "npm", "github", "package", "dependency", "vendor", "third-party", "upstream", "software update", "repository", "malicious package", "open source", "pypi"] },
-  { icon: "🔧", weight: 10, keywords: ["patch", "fixed", "resolved", "update", "remediation", "hotfix", "security bulletin", "patch tuesday"] },
-  { icon: "🤖", weight: 11, keywords: ["ai", "machine learning", "llm", "deepfake", "generative", "prompt injection", "artificial intelligence", "chatgpt", "gpt", "shadow ai"] },
-  { icon: "☁️", weight: 12, keywords: ["aws", "azure", "google cloud", "cloud", "saas", "infrastructure", "oracle", "servicenow"] },
-  { icon: "📱", weight: 13, keywords: ["android", "ios", "iphone", "mobile", "samsung", "google play", "app store", "malicious app"] },
-  { icon: "📡", weight: 14, keywords: ["iot", "router", "camera", "firmware", "embedded", "scada", "industrial", "critical infrastructure"] },
-  { icon: "💰", weight: 15, keywords: ["crypto", "bitcoin", "ethereum", "blockchain", "wallet", "defi", "nft", "smart contract", "coin", "cryptocurrency"] },
-  { icon: "🌐", weight: 16, keywords: ["network", "dns", "tcp", "protocol", "ssl", "tls", "vpn", "proxy", "firewall", "internet"] },
-  { icon: "🔑", weight: 17, keywords: ["password", "credential", "authentication", "login", "mfa", "2fa", "sso", "oauth", "token"] },
-  { icon: "📧", weight: 18, keywords: ["email", "spam", "mail", "outlook", "exchange", "dmarc", "spf", "dkim"] },
-  { icon: "👁️", weight: 19, keywords: ["privacy", "surveillance", "tracking", "fingerprint", "cookies", "gdpr", "ccpa", "data protection"] },
-  { icon: "⚔️", weight: 20, keywords: ["cyberwar", "warfare", "russia", "ukraine", "china", "iran", "north korea", "geopolitical", "sanction"] },
-  { icon: "🌑", weight: 21, keywords: ["darknet", "dark web", "tor", "onion", "silk road", "marketplace", "dnmx"] },
-  { icon: "🔍", weight: 22, keywords: ["forensic", "investigation", "analysis", "reverse engineering", "malware analysis"] },
-  { icon: "📋", weight: 23, keywords: ["compliance", "regulation", "audit", "nist", "iso", "hipaa", "pci", "sox"] },
-  { icon: "📜", weight: 24, keywords: ["certificate", "pki", "ca", "letsencrypt", "encryption"] },
-  { icon: "🏆", weight: 25, keywords: ["bug bounty", "bounty", "hall of fame", "responsible disclosure"] },
-  { icon: "🕸️", weight: 26, keywords: ["threat intel", "threat intelligence", "ttps", "ioc", "indicator", "campaign"] },
-  { icon: "🔬", weight: 27, keywords: ["research", "report", "whitepaper", "study", "survey", "findings", "analysis"] },
-  { icon: "🎙️", weight: 28, keywords: ["podcast", "episode", "interview", "darknet", "diaries"] },
-  { icon: "🎤", weight: 29, keywords: ["conference", "talk", "keynote", "presentation", "bsides", "defcon", "black hat", "rsa", "hacker conference"] },
-  { icon: "💼", weight: 30, keywords: ["job", "career", "hiring", "salary", "position", "recruitment", "layoff"] },
-  { icon: "📰", weight: 31, keywords: ["weekly", "roundup", "digest", "recap", "newsletter"] },
-  { icon: "📢", weight: 32, keywords: ["announce", "launch", "release", "introducing", "new tool"] },
-  { icon: "📂", weight: 33, keywords: ["dox", "doxing", "pii", "personally identifiable"] },
-  { icon: "⛓️", weight: 34, keywords: ["blockchain", "smart contract", "bridge", "cross-chain"] },
-  { icon: "🛡️", weight: 35, keywords: ["defense", "protection", "security", "secure", "mitigation"] },
-  { icon: "🌍", weight: 36, keywords: ["global", "international", "europe", "united states", "government"] },
-  { icon: "⚡", weight: 37, keywords: ["speed", "performance", "fast", "rapid", "quick"] },
-  { icon: "🖥️", weight: 38, keywords: ["windows", "linux", "macos", "operating system", "kernel", "driver"] },
+  { icon: "🧭", weight: 10, keywords: ["attack surface", "attack surfaces", "surface exposure", "surface exposures", "exposure validation", "exposure management", "external exposure", "asm", "exposure"] },
+  { icon: "🔧", weight: 11, keywords: ["patch", "fixed", "resolved", "update", "remediation", "hotfix", "security bulletin", "patch tuesday"] },
+  { icon: "🧩", weight: 12, keywords: ["plugin", "plugins", "extension", "extensions", "add-on", "addon", "browser", "chrome", "firefox", "edge", "jetbrains", "vscode", "visual studio code"] },
+  { icon: "🤖", weight: 13, keywords: ["ai", "machine learning", "llm", "deepfake", "generative", "prompt injection", "artificial intelligence", "chatgpt", "gpt", "shadow ai"] },
+  { icon: "☁️", weight: 14, keywords: ["aws", "azure", "google cloud", "cloud", "saas", "infrastructure", "oracle", "servicenow"] },
+  { icon: "📱", weight: 15, keywords: ["android", "ios", "iphone", "mobile", "samsung", "google play", "app store", "malicious app"] },
+  { icon: "📡", weight: 16, keywords: ["iot", "router", "camera", "firmware", "embedded", "scada", "industrial", "critical infrastructure"] },
+  { icon: "💰", weight: 17, keywords: ["crypto", "bitcoin", "ethereum", "blockchain", "wallet", "defi", "nft", "smart contract", "coin", "cryptocurrency"] },
+  { icon: "🌐", weight: 18, keywords: ["network", "dns", "tcp", "protocol", "ssl", "tls", "vpn", "proxy", "firewall", "internet"] },
+  { icon: "🔑", weight: 19, keywords: ["password", "credential", "authentication", "login", "mfa", "2fa", "sso", "oauth", "token"] },
+  { icon: "👤", weight: 20, keywords: ["account takeover", "account takeovers", "account hijack", "session hijack", "session hijacking", "session token", "cookie theft", "identity", "okta", "entra", "iam", "idp"] },
+  { icon: "📧", weight: 21, keywords: ["email", "spam", "mail", "outlook", "exchange", "dmarc", "spf", "dkim"] },
+  { icon: "💬", weight: 22, keywords: ["telegram", "whatsapp", "signal", "discord", "slack", "teams", "instagram", "facebook", "messaging"] },
+  { icon: "👁️", weight: 23, keywords: ["privacy", "surveillance", "tracking", "fingerprint", "cookies", "gdpr", "ccpa", "data protection"] },
+  { icon: "⚔️", weight: 24, keywords: ["cyberwar", "warfare", "russia", "ukraine", "china", "iran", "north korea", "geopolitical", "sanction"] },
+  { icon: "🌑", weight: 25, keywords: ["darknet", "dark web", "tor", "onion", "silk road", "marketplace", "dnmx"] },
+  { icon: "⚖️", weight: 26, keywords: ["ban", "banned", "takedown", "seized", "seizure", "charged", "indicted", "lawsuit", "court"] },
+  { icon: "🔍", weight: 27, keywords: ["forensic", "investigation", "analysis", "reverse engineering", "malware analysis"] },
+  { icon: "📋", weight: 28, keywords: ["compliance", "regulation", "audit", "nist", "iso", "hipaa", "pci", "sox"] },
+  { icon: "📜", weight: 29, keywords: ["certificate", "pki", "certificate authority", "letsencrypt", "encryption"] },
+  { icon: "🏆", weight: 30, keywords: ["bug bounty", "bounty", "hall of fame", "responsible disclosure"] },
+  { icon: "🕸️", weight: 31, keywords: ["threat intel", "threat intelligence", "ttps", "ioc", "indicator", "campaign"] },
+  { icon: "🔬", weight: 32, keywords: ["research", "report", "whitepaper", "study", "survey", "findings", "analysis"] },
+  { icon: "🎙️", weight: 33, keywords: ["podcast", "episode", "interview", "darknet", "diaries"] },
+  { icon: "🎤", weight: 34, keywords: ["conference", "talk", "keynote", "presentation", "bsides", "defcon", "black hat", "rsa", "hacker conference"] },
+  { icon: "💼", weight: 35, keywords: ["job", "career", "hiring", "salary", "position", "recruitment", "layoff"] },
+  { icon: "📰", weight: 36, keywords: ["weekly", "roundup", "digest", "recap", "newsletter"] },
+  { icon: "📢", weight: 37, keywords: ["announce", "launch", "release", "introducing", "new tool"] },
+  { icon: "📂", weight: 38, keywords: ["dox", "doxing", "pii", "personally identifiable"] },
+  { icon: "⛓️", weight: 39, keywords: ["blockchain", "smart contract", "bridge", "cross-chain"] },
+  { icon: "🛡️", weight: 40, keywords: ["defense", "protection", "security", "secure", "mitigation"] },
+  { icon: "🌍", weight: 41, keywords: ["global", "international", "europe", "united states", "government"] },
+  { icon: "⚡", weight: 42, keywords: ["speed", "performance", "fast", "rapid", "quick"] },
+  { icon: "🖥️", weight: 43, keywords: ["windows", "linux", "macos", "operating system", "kernel", "driver"] },
 ];
 
 function decodeEntities(text: string): string {
@@ -165,14 +169,23 @@ export function extractFeedTitles(xml: string): string[] {
   return fallback;
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function keywordMatches(lowerTitle: string, keyword: string): boolean {
+  const pattern = `(^|[^\\p{L}\\p{N}])${escapeRegExp(keyword)}(?=$|[^\\p{L}\\p{N}])`;
+  return new RegExp(pattern, "iu").test(lowerTitle);
+}
+
 function categorize(title: string): { icon: string; weight: number } {
   const lower = title.toLowerCase();
   for (const category of CATEGORIES) {
-    if (category.keywords.some((keyword) => lower.includes(keyword))) {
+    if (category.keywords.some((keyword) => keywordMatches(lower, keyword))) {
       return { icon: category.icon, weight: category.weight };
     }
   }
-  return { icon: "🔹", weight: 99 };
+  return { icon: "📰", weight: 99 };
 }
 
 function enabledSources(): RssSource[] {
@@ -310,10 +323,10 @@ function buildHeadlineLine(item: NewsItem, width: number, theme: WidgetTheme): s
   return `${prefix}${title}${theme.fg("muted", suffixPlain)}`;
 }
 
-function buildRefreshLine(width: number, remainingMs: number, theme: WidgetTheme): string {
+function buildExpiryLine(width: number, remainingMs: number, theme: WidgetTheme): string {
   const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const spinner = SPINNER_CHARS[tickCount % SPINNER_CHARS.length];
-  return theme.fg("success", centerPlain(`${spinner} refresh in ${seconds}s`, width));
+  return theme.fg("success", centerPlain(`${spinner} hides in ${seconds}s`, width));
 }
 
 function buildWidgetLines(
@@ -323,12 +336,9 @@ function buildWidgetLines(
   enabledCount: number,
   totalSources: number,
   remainingMs: number,
-  usedCache: boolean,
 ): string[] {
   const safeWidth = Math.max(MIN_WIDGET_WIDTH, width);
-  const subtitle = usedCache
-    ? `${enabledCount}/${totalSources} sources enabled • showing cached headlines`
-    : `${enabledCount}/${totalSources} sources enabled`;
+  const subtitle = `${enabledCount}/${totalSources} sources enabled`;
 
   const lines = [
     theme.fg("accent", theme.bold(centerPlain("CYBER NEWS", safeWidth))),
@@ -345,7 +355,7 @@ function buildWidgetLines(
   }
 
   lines.push(theme.fg("dim", truncatePlain("Use /cyber_menu for a deep dive • /cyber_sources to manage", safeWidth)));
-  lines.push(buildRefreshLine(safeWidth, remainingMs, theme));
+  lines.push(buildExpiryLine(safeWidth, remainingMs, theme));
 
   return lines;
 }
@@ -360,13 +370,26 @@ function stopCountdown(): void {
 function renderWidget(ctx: ExtensionContext): void {
   if (!ctx?.ui) return;
 
-  const remainingMs = Math.max(0, AUTO_REFRESH_MS - (Date.now() - widgetStartTime));
+  const remainingMs = Math.max(0, WIDGET_TTL_MS - (Date.now() - widgetStartTime));
   ctx.ui.setWidget("cyber-news", (_tui, theme) => ({
     render(width: number): string[] {
-      return buildWidgetLines(width, theme as WidgetTheme, cachedHeadlines, cachedEnabledCount, SOURCES.length, remainingMs, lastRefreshUsedCache);
+      return buildWidgetLines(width, theme as WidgetTheme, cachedHeadlines, cachedEnabledCount, SOURCES.length, remainingMs);
     },
     invalidate(): void {},
   }));
+}
+
+function startWidgetCountdown(ctx: ExtensionContext): void {
+  stopCountdown();
+  countdownInterval = setInterval(() => {
+    tickCount += 1;
+    const remainingMs = WIDGET_TTL_MS - (Date.now() - widgetStartTime);
+    if (remainingMs <= 0) {
+      void clearHeaderWidget(ctx);
+      return;
+    }
+    renderWidget(ctx);
+  }, 1000);
 }
 
 async function clearHeaderWidget(ctx: ExtensionContext): Promise<void> {
@@ -384,7 +407,6 @@ async function updateHeaderWidget(ctx: ExtensionContext): Promise<void> {
   try {
     const headlines = await fetchAllNews();
     cachedEnabledCount = enabledSources().length;
-    lastRefreshUsedCache = headlines.length === 0 && cachedHeadlines.length > 0;
     if (headlines.length > 0 || cachedHeadlines.length === 0) {
       cachedHeadlines = headlines;
     }
@@ -392,21 +414,13 @@ async function updateHeaderWidget(ctx: ExtensionContext): Promise<void> {
     widgetStartTime = Date.now();
     tickCount = 0;
     renderWidget(ctx);
-
-    countdownInterval = setInterval(() => {
-      tickCount += 1;
-      const remainingMs = AUTO_REFRESH_MS - (Date.now() - widgetStartTime);
-      if (remainingMs <= 0) {
-        void updateHeaderWidget(ctx);
-        return;
-      }
-      renderWidget(ctx);
-    }, 1000);
+    startWidgetCountdown(ctx);
   } catch (error) {
     console.error("[Cyber News] Widget update failed:", error);
     widgetStartTime = Date.now();
     cachedEnabledCount = enabledSources().length;
     renderWidget(ctx);
+    startWidgetCountdown(ctx);
   } finally {
     isRefreshing = false;
   }
@@ -426,7 +440,10 @@ export const __testing = {
         return text;
       },
     };
-    return buildWidgetLines(width, plainTheme, items, enabledCount, totalSources, remainingMs, false);
+    return buildWidgetLines(width, plainTheme, items, enabledCount, totalSources, remainingMs);
+  },
+  categorizeTitle(title: string): { icon: string; weight: number } {
+    return categorize(title);
   },
 };
 

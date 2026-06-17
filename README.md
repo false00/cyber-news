@@ -29,7 +29,7 @@ What it does well:
 - **Interactive source management** — `/cyber_sources` opens a simple TUI source manager
 - **Deep-dive handoff** — `/cyber_menu` queues a focused research prompt for a selected headline
 - **Session-aware state** — enabled source choices persist in the session branch through Pi custom entries
-- **Graceful refresh behavior** — the widget auto-refreshes every minute and keeps the last good headlines when a refresh comes back empty
+- **Ephemeral banner behavior** — the widget shows a short-lived headline banner, then disappears instead of lingering forever
 - **Pi-native packaging** — installable through npm as a normal Pi package
 
 ## Design philosophy
@@ -131,9 +131,9 @@ The widget:
 
 - renders above the editor
 - shows the top prioritized headlines from enabled sources
-- auto-refreshes every 60 seconds
+- disappears after 60 seconds unless you manually refresh it again
 - keeps layout bounded to the widget width instead of guessing based on the full terminal width
-- preserves the last good refresh if a later refresh comes back empty
+- uses broader headline categorization so more stories get specific emoji instead of a generic fallback
 
 ## Sources
 

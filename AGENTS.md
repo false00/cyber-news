@@ -58,7 +58,7 @@ Maintain these behavioral guarantees:
 - `/cyber_enable` and `/cyber_disable` continue to support exact or partial source-name matching.
 - `/cyber_sources` remains interactive in TUI mode and falls back to plain status output outside TUI mode.
 - Widget rendering stays width-aware and must not depend on `process.stdout.columns`.
-- Widget refresh should remain resilient: if a refresh returns no headlines, the last good widget state stays visible.
+- The widget is an ephemeral banner: when its countdown expires, it should clear itself instead of auto-refreshing forever.
 - Source enable/disable state must remain branch-aware through Pi custom session entries.
 - Selecting a story for deep-dive research should continue to inject a hidden Pi message rather than exposing raw internal prompt text to the user by default.
 - Timers and widget state must be cleaned up on `session_shutdown`.
@@ -67,7 +67,7 @@ Maintain these behavioral guarantees:
 
 Documentation must match code.
 
-Whenever you change a command, default, widget behavior, source list, or persistence behavior, update all affected docs:
+Whenever you change a command, default, widget behavior, source list, emoji categorization, or persistence behavior, update all affected docs:
 
 1. Command `description` strings in `index.ts`
 2. `README.md`
