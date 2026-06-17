@@ -118,6 +118,8 @@ Treat this package as user-facing runtime software, not a throwaway demo.
 - Dry-run with `npm pack --dry-run` before publish.
 - Keep tags aligned with `package.json` versions.
 - If npm browser auth / 2FA interrupts publish flow, tell the user plainly and let them complete the auth flow rather than pretending publish succeeded.
+- If the user wants to finish the release manually after prep is done, provide the one-liner `npm publish --ignore-scripts && git push origin master --tags`.
+- If the first publish attempt stops to show a browser-auth URL, tell the user to complete that auth flow and then rerun the same one-liner.
 
 ## Release checklist
 
@@ -129,3 +131,4 @@ When asked to prepare a release:
 4. Verify `README.md` and `AGENTS.md` reflect shipped behavior
 5. Check whether the current version is already published before bumping
 6. Only commit, tag, push, or publish with explicit user approval
+7. If the user prefers to finish the release manually, provide the publish/push one-liner instead of repeatedly retrying around browser-auth prompts
