@@ -4,6 +4,8 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.0 - 2026-06-17
+
 ### Added
 - `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `docs/COMPATIBILITY.md`
 - Non-network test coverage for feed parsing, source matching, widget formatting, and package metadata
