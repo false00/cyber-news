@@ -75,6 +75,43 @@ test("resolveSourceQuery supports exact and partial matching", () => {
   assert.deepEqual(__testing.resolveSourceQuery("sophos"), ["Sophos Security Ops", "Sophos Threat Research"]);
 });
 
+test("source config preview writes all available source states", () => {
+  const config = __testing.sourceConfigPreview();
+
+  assert.equal(config.version, 1);
+  assert.equal(config.sources.length, 14);
+  assert.deepEqual(config.sources.slice(0, 3), [
+    { name: "BleepingComputer", enabled: true },
+    { name: "The Hacker News", enabled: true },
+    { name: "Krebs on Security", enabled: true },
+  ]);
+});
+
+test("source config parser supports persisted per-source states", () => {
+  const parsed = __testing.parseSourceConfig(
+    JSON.stringify({
+      version: 1,
+      sources: [
+        { name: "BleepingComputer", enabled: false },
+        { name: "SANS ISC", enabled: true },
+      ],
+    }),
+  );
+
+  assert.deepEqual(parsed, [
+    ["BleepingComputer", false],
+    ["SANS ISC", true],
+  ]);
+});
+
+test("source config parser migrates legacy enabledSources lists", () => {
+  const parsed = new Map(__testing.parseSourceConfig(JSON.stringify({ enabledSources: ["SANS ISC"] })));
+
+  assert.equal(parsed.get("SANS ISC"), true);
+  assert.equal(parsed.get("BleepingComputer"), false);
+  assert.equal(parsed.get("Krebs on Security"), false);
+});
+
 test("rankForDisplay filters stale dated headlines when fresher items are available", () => {
   const now = Date.parse("2026-06-24T00:00:00Z");
   const ranked = __testing.rankForDisplay(

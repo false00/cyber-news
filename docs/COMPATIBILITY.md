@@ -7,6 +7,7 @@
 - **Node.js:** `>=20`
 - **Pi runtime:** a Pi build with extension support and the `ctx.ui` widget/command APIs used in `index.ts`
 - **Network:** outbound HTTPS access to the enabled RSS and Atom sources
+- **Config storage:** read/write access to `~/.config/cyber-news/sources.json` for source enablement persistence
 
 ## Verified in this repository
 

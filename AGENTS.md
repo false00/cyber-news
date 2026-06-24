@@ -38,7 +38,7 @@ Follow current Pi package guidance:
 - Keep the `pi-package` keyword in `package.json`.
 - Preserve `pi.extensions` so Pi can load the package root directly.
 - If package metadata changes, make sure `npm pack --dry-run` still includes the intended runtime files and top-level docs.
-- Use Pi session custom entries for branch-aware persistence instead of ad hoc local files.
+- Source enablement is intentionally persisted in `~/.config/cyber-news/sources.json`; keep the JSON schema simple and documented, and retain Pi custom session entries only as a compatibility/migration mirror.
 - Render widgets against Pi's provided widget width, not guessed terminal width.
 
 ## Coding standards
@@ -60,7 +60,7 @@ Maintain these behavioral guarantees:
 - Widget rendering stays width-aware and must not depend on `process.stdout.columns`.
 - Dated feed entries older than the freshness window should not pin the widget or menu when fresher headlines are available.
 - The widget is an ephemeral banner: when its countdown expires, it should clear itself instead of auto-refreshing forever.
-- Source enable/disable state must remain branch-aware through Pi custom session entries.
+- Source enable/disable state must persist across Pi sessions through `~/.config/cyber-news/sources.json`, with Pi custom session entries retained only as a compatibility/migration mirror.
 - Selecting a story for deep-dive research should continue to inject a hidden Pi message rather than exposing raw internal prompt text to the user by default.
 - Timers and widget state must be cleaned up on `session_shutdown`.
 

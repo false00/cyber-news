@@ -1,3 +1,7 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 interface NewsItem {
@@ -23,6 +27,16 @@ interface SourceState {
   enabledSources: string[];
 }
 
+interface SourceConfigEntry {
+  name: string;
+  enabled: boolean;
+}
+
+interface SourceConfigFile {
+  version: 1;
+  sources: SourceConfigEntry[];
+}
+
 interface WidgetTheme {
   fg(color: string, text: string): string;
   bold(text: string): string;
@@ -30,6 +44,8 @@ interface WidgetTheme {
 
 const NEWS_TITLE = "Cyber Briefing";
 const SOURCE_STATE_ENTRY = "cyber-news-config";
+const SOURCE_CONFIG_DIR = join(homedir(), ".config", "cyber-news");
+const SOURCE_CONFIG_PATH = join(SOURCE_CONFIG_DIR, "sources.json");
 const DEFAULT_ENABLED_SOURCE_NAMES = new Set([
   "BleepingComputer",
   "The Hacker News",
@@ -69,6 +85,88 @@ const SOURCES: RssSource[] = [
   { name: "USOM Threats", url: "https://www.usom.gov.tr/rss/tehdit.rss", enabled: false },
   { name: "USOM Announcements", url: "https://www.usom.gov.tr/rss/duyuru.rss", enabled: false },
 ];
+
+function resetSourcesToDefaults(): void {
+  for (const source of SOURCES) {
+    source.enabled = DEFAULT_ENABLED_SOURCE_NAMES.has(source.name);
+  }
+}
+
+function sourceConfigSnapshot(): SourceConfigFile {
+  return {
+    version: 1,
+    sources: SOURCES.map((source) => ({
+      name: source.name,
+      enabled: source.enabled,
+    })),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseSourceConfig(content: string): Map<string, boolean> | undefined {
+  const parsed: unknown = JSON.parse(content);
+  if (!isRecord(parsed)) return undefined;
+
+  if (Array.isArray(parsed.sources)) {
+    const sourceStates = new Map<string, boolean>();
+    for (const entry of parsed.sources) {
+      if (!isRecord(entry) || typeof entry.name !== "string" || typeof entry.enabled !== "boolean") continue;
+      sourceStates.set(entry.name, entry.enabled);
+    }
+    return sourceStates.size > 0 ? sourceStates : undefined;
+  }
+
+  if (Array.isArray(parsed.enabledSources)) {
+    const enabled = new Set(parsed.enabledSources.filter((name): name is string => typeof name === "string"));
+    return new Map(SOURCES.map((source) => [source.name, enabled.has(source.name)]));
+  }
+
+  return undefined;
+}
+
+function applySourceConfig(sourceStates: Map<string, boolean>): void {
+  resetSourcesToDefaults();
+
+  for (const source of SOURCES) {
+    const enabled = sourceStates.get(source.name);
+    if (enabled !== undefined) {
+      source.enabled = enabled;
+    }
+  }
+
+  if (enabledSources().length === 0) {
+    resetSourcesToDefaults();
+  }
+
+  cachedEnabledCount = enabledSources().length;
+}
+
+function applyLegacySourceState(state: SourceState): void {
+  const enabled = new Set(state.enabledSources);
+  applySourceConfig(new Map(SOURCES.map((source) => [source.name, enabled.has(source.name)])));
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
+
+async function readSourceConfig(): Promise<Map<string, boolean> | undefined> {
+  try {
+    return parseSourceConfig(await readFile(SOURCE_CONFIG_PATH, "utf8"));
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") return undefined;
+    console.error(`[Cyber News] Unable to read source config at ${SOURCE_CONFIG_PATH}:`, error);
+    return undefined;
+  }
+}
+
+async function writeSourceConfig(): Promise<void> {
+  await mkdir(SOURCE_CONFIG_DIR, { recursive: true });
+  await writeFile(SOURCE_CONFIG_PATH, `${JSON.stringify(sourceConfigSnapshot(), null, 2)}\n`, "utf8");
+}
 
 const CATEGORIES = [
   { icon: "💀", weight: 1, keywords: ["ransomware", "ransom", "lockbit", "blackcat", "alphv", "clop", "hive", "conti", "ryuk", "revil", "darkside", "encrypt", "decrypt"] },
@@ -534,46 +632,64 @@ export const __testing = {
   rankForDisplay(items: NewsItem[], now: number): NewsItem[] {
     return rankNewsItems(items, now);
   },
+  parseSourceConfig(content: string): Array<[string, boolean]> {
+    return [...(parseSourceConfig(content) ?? new Map()).entries()];
+  },
+  sourceConfigPreview(): SourceConfigFile {
+    return sourceConfigSnapshot();
+  },
 };
 
 export default async function cyberNewsExtension(pi: ExtensionAPI) {
-  function resetSourcesToDefaults(): void {
-    for (const source of SOURCES) {
-      source.enabled = DEFAULT_ENABLED_SOURCE_NAMES.has(source.name);
-    }
-  }
-
-  function persistSourceState(): void {
-    pi.appendEntry<SourceState>(SOURCE_STATE_ENTRY, {
-      enabledSources: enabledSources().map((source) => source.name),
-    });
-  }
-
-  function restoreSourceState(ctx: ExtensionContext): void {
-    resetSourcesToDefaults();
-
+  function branchSourceState(ctx: ExtensionContext): SourceState | undefined {
     let savedState: SourceState | undefined;
     for (const entry of ctx.sessionManager.getBranch()) {
       if (entry.type === "custom" && entry.customType === SOURCE_STATE_ENTRY) {
         savedState = entry.data as SourceState | undefined;
       }
     }
+    return savedState;
+  }
 
-    if (!savedState?.enabledSources?.length) {
-      cachedEnabledCount = enabledSources().length;
+  async function persistSourceState(ctx: ExtensionContext): Promise<void> {
+    pi.appendEntry<SourceState>(SOURCE_STATE_ENTRY, {
+      enabledSources: enabledSources().map((source) => source.name),
+    });
+
+    try {
+      await writeSourceConfig();
+    } catch (error) {
+      console.error(`[Cyber News] Unable to save source config at ${SOURCE_CONFIG_PATH}:`, error);
+      ctx.ui.notify(`Unable to save Cyber News source settings to ${SOURCE_CONFIG_PATH}.`, "warning");
+    }
+  }
+
+  async function restoreSourceState(ctx: ExtensionContext): Promise<void> {
+    resetSourcesToDefaults();
+
+    const sourceConfig = await readSourceConfig();
+    if (sourceConfig) {
+      applySourceConfig(sourceConfig);
+      try {
+        await writeSourceConfig();
+      } catch (error) {
+        console.error(`[Cyber News] Unable to normalize source config at ${SOURCE_CONFIG_PATH}:`, error);
+      }
       return;
     }
 
-    const enabled = new Set(savedState.enabledSources);
-    for (const source of SOURCES) {
-      source.enabled = enabled.has(source.name);
+    const savedState = branchSourceState(ctx);
+    if (savedState?.enabledSources?.length) {
+      applyLegacySourceState(savedState);
+    } else {
+      cachedEnabledCount = enabledSources().length;
     }
 
-    if (enabledSources().length === 0) {
-      resetSourcesToDefaults();
+    try {
+      await writeSourceConfig();
+    } catch (error) {
+      console.error(`[Cyber News] Unable to create source config at ${SOURCE_CONFIG_PATH}:`, error);
     }
-
-    cachedEnabledCount = enabledSources().length;
   }
 
   async function chooseSourceFromMatches(
@@ -621,7 +737,7 @@ export default async function cyberNewsExtension(pi: ExtensionAPI) {
     }
 
     source.enabled = enabled;
-    persistSourceState();
+    await persistSourceState(ctx);
     await updateHeaderWidget(ctx);
     ctx.ui.notify(`${enabled ? "Enabled" : "Disabled"} ${source.name}.`, "info");
     return true;
@@ -684,7 +800,7 @@ export default async function cyberNewsExtension(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
-    restoreSourceState(ctx);
+    await restoreSourceState(ctx);
     await updateHeaderWidget(ctx);
     ctx.ui.notify(
       `Cyber Briefing active — ${enabledSources().length}/${SOURCES.length} sources enabled. ` +
@@ -694,7 +810,7 @@ export default async function cyberNewsExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_tree", async (_event, ctx) => {
-    restoreSourceState(ctx);
+    await restoreSourceState(ctx);
     await updateHeaderWidget(ctx);
   });
 

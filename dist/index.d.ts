@@ -10,6 +10,14 @@ interface FeedItem {
     title: string;
     publishedAt?: number;
 }
+interface SourceConfigEntry {
+    name: string;
+    enabled: boolean;
+}
+interface SourceConfigFile {
+    version: 1;
+    sources: SourceConfigEntry[];
+}
 declare function extractFeedItems(xml: string): FeedItem[];
 export declare function extractFeedTitles(xml: string): string[];
 export declare const __testing: {
@@ -22,6 +30,8 @@ export declare const __testing: {
         weight: number;
     };
     rankForDisplay(items: NewsItem[], now: number): NewsItem[];
+    parseSourceConfig(content: string): Array<[string, boolean]>;
+    sourceConfigPreview(): SourceConfigFile;
 };
 export default function cyberNewsExtension(pi: ExtensionAPI): Promise<void>;
 export {};

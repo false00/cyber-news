@@ -16,7 +16,7 @@ This package aims to stay:
 Security-relevant behavior:
 
 - fetches public RSS and Atom feeds over HTTPS
-- stores enabled-source state in Pi custom session entries
+- stores enabled-source state in `~/.config/cyber-news/sources.json`, with legacy Pi custom session entries used only for migration/fallback
 - injects a hidden user-style message when `/cyber_menu` is used
 - renders a live widget above the editor in Pi
 
@@ -24,7 +24,7 @@ Security-relevant behavior:
 
 - no custom LLM tools
 - no shell execution
-- no local file writes outside normal npm/package files
+- no local file writes outside normal npm/package files except `~/.config/cyber-news/sources.json` for source preferences
 - no credential handling
 - no external API keys
 
@@ -46,7 +46,7 @@ Please include:
 
 ## Areas worth reviewing carefully
 
-- session-state persistence via custom entries
+- source-preference persistence in `~/.config/cyber-news/sources.json`
 - hidden prompt injection for deep-dive workflows
 - feed parsing logic for malformed or hostile XML content
 - package-install trust signals and published file set
