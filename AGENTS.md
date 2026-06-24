@@ -58,6 +58,7 @@ Maintain these behavioral guarantees:
 - `/cyber_enable` and `/cyber_disable` continue to support exact or partial source-name matching.
 - `/cyber_sources` remains interactive in TUI mode and falls back to plain status output outside TUI mode.
 - Widget rendering stays width-aware and must not depend on `process.stdout.columns`.
+- Dated feed entries older than the freshness window should not pin the widget or menu when fresher headlines are available.
 - The widget is an ephemeral banner: when its countdown expires, it should clear itself instead of auto-refreshing forever.
 - Source enable/disable state must remain branch-aware through Pi custom session entries.
 - Selecting a story for deep-dive research should continue to inject a hidden Pi message rather than exposing raw internal prompt text to the user by default.

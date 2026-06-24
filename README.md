@@ -130,7 +130,8 @@ Disable Troy Hunt in the cyber-news extension
 The widget:
 
 - renders above the editor
-- shows the top prioritized headlines from enabled sources
+- shows fresh, prioritized headlines from enabled sources
+- filters dated items older than 7 days when fresher headlines are available, so old high-severity stories do not stay pinned
 - disappears after 60 seconds unless you manually refresh it again
 - keeps layout bounded to the widget width instead of guessing based on the full terminal width
 - uses broader headline categorization so more stories get specific emoji instead of a generic fallback

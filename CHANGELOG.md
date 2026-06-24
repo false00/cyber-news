@@ -4,6 +4,11 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.3 - 2026-06-24
+
+### Changed
+- Added feed-date parsing and freshness-aware ranking so dated headlines older than 7 days no longer outrank fresher stories when newer items are available.
+
 ## 1.1.2 - 2026-06-17
 
 ### Changed

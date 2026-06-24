@@ -44,9 +44,85 @@ test("extractFeedTitles handles Atom entry feeds", () => {
   ]);
 });
 
+test("extractFeedItems parses RSS, Atom, and namespaced feed dates", () => {
+  const xml = `
+    <rss>
+      <channel>
+        <item>
+          <title><![CDATA[Critical patch released for VPN appliance]]></title>
+          <pubDate>Tue, 23 Jun 2026 17:48:32 -0400</pubDate>
+        </item>
+        <entry>
+          <title>APT campaign targets cloud identities</title>
+          <updated>2026-06-22T12:00:00Z</updated>
+        </entry>
+        <item>
+          <title>Researchers publish malware analysis</title>
+          <dc:date>2026-06-21T08:30:00Z</dc:date>
+        </item>
+      </channel>
+    </rss>
+  `;
+
+  const items = __testing.extractFeedItems(xml);
+  assert.equal(items[0]?.publishedAt, Date.parse("Tue, 23 Jun 2026 17:48:32 -0400"));
+  assert.equal(items[1]?.publishedAt, Date.parse("2026-06-22T12:00:00Z"));
+  assert.equal(items[2]?.publishedAt, Date.parse("2026-06-21T08:30:00Z"));
+});
+
 test("resolveSourceQuery supports exact and partial matching", () => {
   assert.deepEqual(__testing.resolveSourceQuery("SANS ISC"), ["SANS ISC"]);
   assert.deepEqual(__testing.resolveSourceQuery("sophos"), ["Sophos Security Ops", "Sophos Threat Research"]);
+});
+
+test("rankForDisplay filters stale dated headlines when fresher items are available", () => {
+  const now = Date.parse("2026-06-24T00:00:00Z");
+  const ranked = __testing.rankForDisplay(
+    [
+      {
+        icon: "💀",
+        title: "Who Runs the Ransomware Group ‘The Gentlemen?’",
+        weight: 1,
+        source: "Krebs on Security",
+        publishedAt: Date.parse("2026-06-10T14:03:44Z"),
+      },
+      {
+        icon: "🔓",
+        title: "Fresh breach headline",
+        weight: 3,
+        source: "BleepingComputer",
+        publishedAt: now - 60 * 60 * 1000,
+      },
+      {
+        icon: "🔧",
+        title: "Fresh patch headline",
+        weight: 11,
+        source: "The Hacker News",
+        publishedAt: now - 2 * 60 * 60 * 1000,
+      },
+    ],
+    now,
+  );
+
+  assert.deepEqual(ranked.map((item) => item.title), ["Fresh breach headline", "Fresh patch headline"]);
+});
+
+test("rankForDisplay keeps stale dated headlines as a fallback when nothing fresh is available", () => {
+  const now = Date.parse("2026-06-24T00:00:00Z");
+  const ranked = __testing.rankForDisplay(
+    [
+      {
+        icon: "💀",
+        title: "Older ransomware headline",
+        weight: 1,
+        source: "Krebs on Security",
+        publishedAt: Date.parse("2026-06-10T14:03:44Z"),
+      },
+    ],
+    now,
+  );
+
+  assert.deepEqual(ranked.map((item) => item.title), ["Older ransomware headline"]);
 });
 
 test("widget preview lines stay within the requested width", () => {

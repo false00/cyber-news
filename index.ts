@@ -5,6 +5,12 @@ interface NewsItem {
   icon: string;
   weight: number;
   source: string;
+  publishedAt?: number;
+}
+
+interface FeedItem {
+  title: string;
+  publishedAt?: number;
 }
 
 interface RssSource {
@@ -33,6 +39,9 @@ const MIN_WIDGET_WIDTH = 32;
 const MAX_WIDGET_ITEMS = 6;
 const MAX_MENU_ITEMS = 30;
 const ITEMS_PER_SOURCE = 3;
+const HOT_ITEM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RECENT_ITEM_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+const FRESH_ITEM_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 const WIDGET_TTL_MS = 60_000;
 const SPINNER_CHARS = ["◐", "◓", "◑", "◒"];
@@ -136,41 +145,72 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-export function extractFeedTitles(xml: string): string[] {
-  const titles: string[] = [];
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cleanFeedText(raw: string): string {
+  return decodeEntities(stripTags(raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractTagText(block: string, localName: string, allowNamespace = false): string | undefined {
+  const tagName = allowNamespace ? `(?:[\\w.-]+:)?${escapeRegExp(localName)}` : escapeRegExp(localName);
+  const match = block.match(new RegExp(`<(${tagName})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, "i"));
+  if (!match) return undefined;
+
+  const text = cleanFeedText(match[2] ?? "");
+  return text || undefined;
+}
+
+function parseFeedDate(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
+function extractFeedDate(block: string): number | undefined {
+  for (const tag of ["pubDate", "updated", "published"]) {
+    const timestamp = parseFeedDate(extractTagText(block, tag));
+    if (timestamp !== undefined) return timestamp;
+  }
+
+  return parseFeedDate(extractTagText(block, "date", true));
+}
+
+function extractFeedItems(xml: string): FeedItem[] {
+  const items: FeedItem[] = [];
   const blockRegex = /<(item|entry)\b[\s\S]*?<\/\1>/gi;
   const blocks = xml.match(blockRegex) ?? [];
 
   for (const block of blocks) {
-    const match = block.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-    if (!match) continue;
-
-    const raw = match[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1") ?? "";
-    const title = decodeEntities(stripTags(raw)).replace(/\s+/g, " ").trim();
+    const title = extractTagText(block, "title");
     if (title) {
-      titles.push(title);
+      const publishedAt = extractFeedDate(block);
+      items.push(publishedAt === undefined ? { title } : { title, publishedAt });
     }
   }
 
-  if (titles.length > 0) {
-    return titles;
+  if (items.length > 0) {
+    return items;
   }
 
-  const fallback: string[] = [];
+  const fallback: FeedItem[] = [];
   const titleRegex = /<title\b[^>]*>([\s\S]*?)<\/title>/gi;
   let match: RegExpExecArray | null;
   while ((match = titleRegex.exec(xml)) !== null) {
-    const raw = match[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1") ?? "";
-    const title = decodeEntities(stripTags(raw)).replace(/\s+/g, " ").trim();
+    const title = cleanFeedText(match[1] ?? "");
     if (title) {
-      fallback.push(title);
+      fallback.push({ title });
     }
   }
   return fallback;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export function extractFeedTitles(xml: string): string[] {
+  return extractFeedItems(xml).map((item) => item.title);
 }
 
 function keywordMatches(lowerTitle: string, keyword: string): boolean {
@@ -237,27 +277,72 @@ async function fetchSource(source: RssSource): Promise<NewsItem[]> {
     if (!response.ok) return [];
 
     const xml = await response.text();
-    const titles = extractFeedTitles(xml);
+    const candidates = extractFeedItems(xml);
     const items: NewsItem[] = [];
     const seen = new Set<string>();
 
-    for (const candidate of titles) {
+    for (const candidate of candidates) {
       if (items.length >= ITEMS_PER_SOURCE) break;
 
-      const title = candidate.replace(/\s+/g, " ").trim();
+      const title = candidate.title.replace(/\s+/g, " ").trim();
       const key = title.toLowerCase();
       if (!title || title.length < 6 || seen.has(key)) continue;
       if (key.startsWith("rss feed") || key === source.name.toLowerCase()) continue;
 
       seen.add(key);
       const { icon, weight } = categorize(title);
-      items.push({ title, icon, weight, source: source.name });
+      items.push({
+        title,
+        icon,
+        weight,
+        source: source.name,
+        ...(candidate.publishedAt === undefined ? {} : { publishedAt: candidate.publishedAt }),
+      });
     }
 
     return items;
   } catch {
     return [];
   }
+}
+
+function newsAgeMs(item: NewsItem, now: number): number | undefined {
+  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt)) return undefined;
+  return Math.max(0, now - item.publishedAt);
+}
+
+function isFreshForDisplay(item: NewsItem, now: number): boolean {
+  const age = newsAgeMs(item, now);
+  return age === undefined || age <= FRESH_ITEM_MAX_AGE_MS;
+}
+
+function freshnessBucket(item: NewsItem, now: number): number {
+  const age = newsAgeMs(item, now);
+  if (age === undefined) return 3;
+  if (age <= HOT_ITEM_MAX_AGE_MS) return 0;
+  if (age <= RECENT_ITEM_MAX_AGE_MS) return 1;
+  if (age <= FRESH_ITEM_MAX_AGE_MS) return 2;
+  return 4;
+}
+
+function compareNewsItems(left: NewsItem, right: NewsItem, now: number): number {
+  const freshnessDifference = freshnessBucket(left, now) - freshnessBucket(right, now);
+  if (freshnessDifference !== 0) return freshnessDifference;
+
+  const priorityDifference = left.weight - right.weight;
+  if (priorityDifference !== 0) return priorityDifference;
+
+  const leftPublishedAt = Math.min(left.publishedAt ?? 0, now);
+  const rightPublishedAt = Math.min(right.publishedAt ?? 0, now);
+  if (leftPublishedAt !== rightPublishedAt) return rightPublishedAt - leftPublishedAt;
+
+  return left.source.localeCompare(right.source) || left.title.localeCompare(right.title);
+}
+
+function rankNewsItems(items: NewsItem[], now = Date.now()): NewsItem[] {
+  const displayable = items.filter((item) => isFreshForDisplay(item, now));
+  const pool = displayable.length > 0 ? displayable : items;
+  return [...pool].sort((left, right) => compareNewsItems(left, right, now));
 }
 
 async function fetchAllNews(): Promise<NewsItem[]> {
@@ -279,7 +364,7 @@ async function fetchAllNews(): Promise<NewsItem[]> {
     }
   }
 
-  return allItems.sort((left, right) => left.weight - right.weight || left.source.localeCompare(right.source));
+  return rankNewsItems(allItems);
 }
 
 function visibleWidth(text: string): number {
@@ -427,6 +512,7 @@ async function updateHeaderWidget(ctx: ExtensionContext): Promise<void> {
 }
 
 export const __testing = {
+  extractFeedItems,
   extractFeedTitles,
   resolveSourceQuery(query: string): string[] {
     return resolveSourceMatches(query).map((source) => source.name);
@@ -444,6 +530,9 @@ export const __testing = {
   },
   categorizeTitle(title: string): { icon: string; weight: number } {
     return categorize(title);
+  },
+  rankForDisplay(items: NewsItem[], now: number): NewsItem[] {
+    return rankNewsItems(items, now);
   },
 };
 

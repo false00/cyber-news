@@ -40,4 +40,4 @@ If Pi changes widget rendering, command context, or session custom-entry behavio
 
 News sources can change feed URLs, XML structure, or HTML encoding over time.
 
-The current parser is designed to handle both RSS-style `<item>` entries and Atom-style `<entry>` entries, with a fallback `<title>` scan for less common feeds. If a source stops returning headlines, verify the upstream feed before assuming a local code regression.
+The current parser is designed to handle both RSS-style `<item>` entries and Atom-style `<entry>` entries, common date fields such as `<pubDate>`, `<updated>`, `<published>`, and namespaced `<dc:date>`, with a fallback `<title>` scan for less common feeds. If a source stops returning headlines or dates, verify the upstream feed before assuming a local code regression.
