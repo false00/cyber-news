@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { eastAsianWidth } from "get-east-asian-width";
 
-import { __testing } from "../index.ts";
+import cyberNewsExtension, { __testing } from "../index.ts";
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const zeroWidthGraphemeRegex = /^(?:\p{Default_Ignorable_Code_Point}|\p{Control}|\p{Mark})+$/u;
@@ -262,4 +263,34 @@ test("categorizeTitle covers common headline patterns with specific emoji", () =
   assert.equal(__testing.categorizeTitle("Malicious JetBrains Plugins Steal AI API Keys").icon, "🧩");
   assert.equal(__testing.categorizeTitle("Completely uncategorized headline example").icon, "📰");
   assert.notEqual(__testing.categorizeTitle("API security roundup for enterprise developers").icon, "🕵️");
+});
+
+test("agent_start clears the widget so it does not linger during active work", async () => {
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void> | void>();
+  const pi = {
+    on(event: string, handler: (event: unknown, ctx: ExtensionContext) => Promise<void> | void) {
+      handlers.set(event, handler);
+    },
+    registerCommand() {},
+    appendEntry() {},
+    sendMessage() {},
+  } as unknown as ExtensionAPI;
+
+  await cyberNewsExtension(pi);
+
+  const widgetCalls: unknown[][] = [];
+  const ctx = {
+    ui: {
+      setWidget: (...args: unknown[]) => {
+        widgetCalls.push(args);
+      },
+    },
+  } as unknown as ExtensionContext;
+
+  const handler = handlers.get("agent_start");
+  assert.ok(handler, "agent_start handler was not registered");
+
+  await handler({ type: "agent_start" }, ctx);
+
+  assert.deepEqual(widgetCalls, [["cyber-news", undefined]]);
 });

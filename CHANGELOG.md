@@ -4,6 +4,11 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.6 - 2026-07-01
+
+### Fixed
+- The Cyber News widget now clears itself when Pi starts an agent run, so it does not linger onscreen during long tool or subagent work.
+
 ## 1.1.5 - 2026-07-01
 
 ### Fixed

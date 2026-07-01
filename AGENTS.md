@@ -59,7 +59,7 @@ Maintain these behavioral guarantees:
 - `/cyber_sources` remains interactive in TUI mode and falls back to plain status output outside TUI mode.
 - Widget rendering stays width-aware and must not depend on `process.stdout.columns`.
 - Dated feed entries older than the freshness window should not pin the widget or menu when fresher headlines are available.
-- The widget is an ephemeral banner: when its countdown expires, it should clear itself instead of auto-refreshing forever.
+- The widget is an ephemeral banner: when its countdown expires, or when Pi starts active agent work, it should clear itself instead of auto-refreshing forever or lingering over long tool/subagent runs.
 - Source enable/disable state must persist across Pi sessions through `~/.config/cyber-news/sources.json`, with Pi custom session entries retained only as a compatibility/migration mirror.
 - Selecting a story for deep-dive research should continue to inject a hidden Pi message rather than exposing raw internal prompt text to the user by default.
 - Timers and widget state must be cleaned up on `session_shutdown`.

@@ -29,7 +29,7 @@ What it does well:
 - **Interactive source management** — `/cyber_sources` opens a simple TUI source manager
 - **Deep-dive handoff** — `/cyber_menu` queues a focused research prompt for a selected headline
 - **Persistent source state** — enabled source choices persist across Pi sessions in `~/.config/cyber-news/sources.json`
-- **Ephemeral banner behavior** — the widget shows a short-lived headline banner, then disappears instead of lingering forever
+- **Ephemeral banner behavior** — the widget shows a short-lived headline banner, then disappears instead of lingering forever or hanging around during long agent/subagent work
 - **Pi-native packaging** — installable through npm as a normal Pi package
 
 ## Design philosophy
@@ -133,6 +133,7 @@ The widget:
 - shows fresh, prioritized headlines from enabled sources
 - filters dated items older than 7 days when fresher headlines are available, so old high-severity stories do not stay pinned
 - disappears after 60 seconds unless you manually refresh it again
+- clears itself as soon as Pi starts an active agent run, so it does not linger over long tool or subagent activity
 - keeps layout bounded to the widget width instead of guessing based on the full terminal width
 - uses broader headline categorization so more stories get specific emoji instead of a generic fallback
 

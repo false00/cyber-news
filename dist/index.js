@@ -714,6 +714,9 @@ export default async function cyberNewsExtension(pi) {
         await restoreSourceState(ctx);
         await updateHeaderWidget(ctx);
     });
+    pi.on("agent_start", async (_event, ctx) => {
+        await clearHeaderWidget(ctx);
+    });
     pi.on("session_shutdown", async (_event, ctx) => {
         await clearHeaderWidget(ctx);
     });
