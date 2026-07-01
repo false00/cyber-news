@@ -1,13 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { eastAsianWidth } from "get-east-asian-width";
+
 import { __testing } from "../index.ts";
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const zeroWidthGraphemeRegex = /^(?:\p{Default_Ignorable_Code_Point}|\p{Control}|\p{Mark})+$/u;
+const emojiPresentationRegex = /\p{Extended_Pictographic}/u;
+
+function graphemeWidth(segment: string): number {
+  if (segment === "\t") return 3;
+  if (segment.length === 0 || zeroWidthGraphemeRegex.test(segment)) return 0;
+  if (emojiPresentationRegex.test(segment) || segment.includes("\uFE0F") || segment.includes("\u200D")) return 2;
+
+  const cp = segment.codePointAt(0);
+  if (cp === undefined) return 0;
+  if (cp >= 0x1f1e6 && cp <= 0x1f1ff) return 2;
+
+  return eastAsianWidth(cp);
+}
+
 function visibleWidth(text: string): number {
-  const plain = text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+  const plain = text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "").replace(/\t/g, "   ");
   let width = 0;
-  for (const char of plain) {
-    width += char.codePointAt(0)! > 0xffff ? 2 : 1;
+  for (const { segment } of graphemeSegmenter.segment(plain)) {
+    width += graphemeWidth(segment);
   }
   return width;
 }
@@ -188,6 +206,52 @@ test("widget preview lines stay within the requested width", () => {
   assert.equal(lines.at(-1)?.includes("hides in"), true);
   for (const line of lines) {
     assert.ok(visibleWidth(line) <= 60, `line exceeds width: ${JSON.stringify(line)}`);
+  }
+});
+
+
+test("widget preview respects width for BMP emoji headline icons", () => {
+  assert.equal(visibleWidth("⚡"), 2);
+
+  const lines = __testing.buildWidgetPreview(
+    72,
+    [
+      {
+        icon: "⚡",
+        title: "Anthropic rolls out Sonnet 5 with near-Opus 4.8 performance on coding workloads",
+        weight: 1,
+        source: "BleepingComputer",
+      },
+    ],
+    4,
+    14,
+    60000,
+  );
+
+  for (const line of lines) {
+    assert.ok(visibleWidth(line) <= 72, `line exceeds width: ${JSON.stringify(line)}`);
+  }
+});
+
+
+test("widget preview respects narrow requested widths", () => {
+  const lines = __testing.buildWidgetPreview(
+    20,
+    [
+      {
+        icon: "⚡",
+        title: "Short headline that still needs truncation",
+        weight: 1,
+        source: "BleepingComputer",
+      },
+    ],
+    3,
+    14,
+    59000,
+  );
+
+  for (const line of lines) {
+    assert.ok(visibleWidth(line) <= 20, `line exceeds width: ${JSON.stringify(line)}`);
   }
 });
 

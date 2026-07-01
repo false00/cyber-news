@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { eastAsianWidth } from "get-east-asian-width";
 
 interface NewsItem {
   title: string;
@@ -51,7 +52,6 @@ const DEFAULT_ENABLED_SOURCE_NAMES = new Set([
   "The Hacker News",
   "Krebs on Security",
 ]);
-const MIN_WIDGET_WIDTH = 32;
 const MAX_WIDGET_ITEMS = 6;
 const MAX_MENU_ITEMS = 30;
 const ITEMS_PER_SOURCE = 3;
@@ -465,11 +465,27 @@ async function fetchAllNews(): Promise<NewsItem[]> {
   return rankNewsItems(allItems);
 }
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const zeroWidthGraphemeRegex = /^(?:\p{Default_Ignorable_Code_Point}|\p{Control}|\p{Mark})+$/u;
+const emojiPresentationRegex = /\p{Extended_Pictographic}/u;
+
+function graphemeWidth(segment: string): number {
+  if (segment === "\t") return 3;
+  if (segment.length === 0 || zeroWidthGraphemeRegex.test(segment)) return 0;
+  if (emojiPresentationRegex.test(segment) || segment.includes("\uFE0F") || segment.includes("\u200D")) return 2;
+
+  const cp = segment.codePointAt(0);
+  if (cp === undefined) return 0;
+  if (cp >= 0x1F1E6 && cp <= 0x1F1FF) return 2;
+
+  return eastAsianWidth(cp);
+}
+
 function visibleWidth(text: string): number {
-  const plain = stripAnsi(text);
+  const plain = stripAnsi(text).replace(/\t/g, "   ");
   let width = 0;
-  for (const char of plain) {
-    width += char.codePointAt(0)! > 0xFFFF ? 2 : 1;
+  for (const { segment } of graphemeSegmenter.segment(plain)) {
+    width += graphemeWidth(segment);
   }
   return width;
 }
@@ -477,17 +493,21 @@ function visibleWidth(text: string): number {
 function truncatePlain(text: string, width: number): string {
   if (width <= 0) return "";
   if (visibleWidth(text) <= width) return text;
-  if (width === 1) return "…";
 
+  const ellipsis = "…";
+  const ellipsisWidth = visibleWidth(ellipsis);
+  if (ellipsisWidth >= width) return ellipsis;
+
+  const targetWidth = width - ellipsisWidth;
   let result = "";
   let used = 0;
-  for (const char of text) {
-    const charWidth = char.codePointAt(0)! > 0xFFFF ? 2 : 1;
-    if (used + charWidth > width - 1) break;
-    result += char;
-    used += charWidth;
+  for (const { segment } of graphemeSegmenter.segment(text)) {
+    const segmentWidth = graphemeWidth(segment);
+    if (used + segmentWidth > targetWidth) break;
+    result += segment;
+    used += segmentWidth;
   }
-  return `${result}…`;
+  return `${result}${ellipsis}`;
 }
 
 function centerPlain(text: string, width: number): string {
@@ -500,8 +520,14 @@ function centerPlain(text: string, width: number): string {
 
 function buildHeadlineLine(item: NewsItem, width: number, theme: WidgetTheme): string {
   const prefix = `${item.icon} `;
-  const suffixPlain = ` · ${item.source}`;
-  const titleWidth = Math.max(10, width - visibleWidth(prefix) - visibleWidth(suffixPlain));
+  const prefixWidth = visibleWidth(prefix);
+  if (width <= prefixWidth) return truncatePlain(prefix.trimEnd(), width);
+
+  const rawSuffix = ` · ${item.source}`;
+  const availableWidth = Math.max(0, width - prefixWidth);
+  const suffixWidth = Math.max(0, Math.min(visibleWidth(rawSuffix), availableWidth - 1));
+  const suffixPlain = suffixWidth > 0 ? truncatePlain(rawSuffix, suffixWidth) : "";
+  const titleWidth = Math.max(1, availableWidth - visibleWidth(suffixPlain));
   const title = truncatePlain(item.title, titleWidth);
   return `${prefix}${title}${theme.fg("muted", suffixPlain)}`;
 }
@@ -520,7 +546,7 @@ function buildWidgetLines(
   totalSources: number,
   remainingMs: number,
 ): string[] {
-  const safeWidth = Math.max(MIN_WIDGET_WIDTH, width);
+  const safeWidth = Math.max(1, width);
   const subtitle = `${enabledCount}/${totalSources} sources enabled`;
 
   const lines = [

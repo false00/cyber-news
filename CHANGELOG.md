@@ -4,6 +4,12 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.5 - 2026-07-01
+
+### Fixed
+- Widget headline rendering now uses grapheme-aware width measurement for emoji, so BMP icons like `⚡` no longer overflow Pi's exact widget width and crash narrow sessions.
+- Widget layout now respects the exact width provided by Pi instead of expanding to an internal minimum width on narrow terminals.
+
 ## 1.1.4 - 2026-06-24
 
 ### Changed

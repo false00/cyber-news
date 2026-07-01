@@ -1,6 +1,6 @@
 {
   "name": "@false00/cyber-news",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Interactive cybersecurity news briefing for the Pi coding agent with live multi-source headlines and deep-dive story prompts",
   "type": "module",
   "main": "dist/index.js",
@@ -72,5 +72,8 @@
     "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "get-east-asian-width": "^1.6.0"
   }
 }
