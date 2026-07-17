@@ -14,6 +14,7 @@
     "README.md",
     "SECURITY.md",
     "docs/COMPATIBILITY.md",
+    "docs/assets/cyber-news-widget.png",
     "LICENSE"
   ],
   "exports": {
@@ -25,6 +26,7 @@
   "keywords": [
     "pi-package",
     "pi-extension",
+    "pi.dev",
     "pi-coding-agent",
     "cybersecurity",
     "news",
@@ -68,7 +70,7 @@
     "@earendil-works/pi-coding-agent": ">=0.79.0 <0.80.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.79.6",
+    "@earendil-works/pi-coding-agent": "^0.79.10",
     "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

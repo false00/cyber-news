@@ -4,6 +4,14 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+### Added
+- Dependabot updates for npm dependencies and GitHub Actions.
+- GitHub security automation with dependency review on pull requests and scheduled CodeQL scanning.
+- A bundled README widget preview asset plus package tests that lock in Pi discovery metadata.
+
+### Changed
+- Bumped the local Pi dev dependency floor to `@earendil-works/pi-coding-agent@^0.79.10` so `npm audit` clears the current high-severity transitive findings.
+
 ## 1.1.6 - 2026-07-01
 
 ### Fixed

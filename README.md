@@ -8,6 +8,8 @@ Interactive cybersecurity news briefing for the Pi coding agent.
 
 `@false00/cyber-news` adds a Pi-native header widget that pulls live headlines from 14 cybersecurity sources, lets you manage sources from the TUI, and can queue a deep-dive research prompt for any story you pick.
 
+![Cyber News widget preview](docs/assets/cyber-news-widget.png)
+
 | Resource | Link |
 |---|---|
 | npm | [`@false00/cyber-news`](https://www.npmjs.com/package/@false00/cyber-news) |
@@ -210,7 +212,7 @@ The test suite covers:
 - feed title extraction behavior
 - source-query matching behavior
 - widget line-width formatting guarantees
-- package metadata and publish-file expectations
+- package metadata, Pi discovery signals, and publish-file expectations
 
 ## Publishing
 
