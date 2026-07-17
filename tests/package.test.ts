@@ -8,7 +8,7 @@ const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
   description?: string;
   files?: string[];
   keywords?: string[];
-  pi?: { extensions?: string[] };
+  pi?: { extensions?: string[]; image?: string };
   repository?: { url?: string };
   homepage?: string;
   bugs?: { url?: string };
@@ -51,6 +51,10 @@ test("package metadata advertises Pi extension discovery", () => {
   assert.ok(keywords.has("pi.dev"), "missing pi.dev keyword");
 
   assert.deepEqual(packageJson.pi?.extensions, ["./dist/index.js"]);
+  assert.equal(
+    packageJson.pi?.image,
+    "https://cdn.jsdelivr.net/npm/@false00/cyber-news/docs/assets/cyber-news-widget.png",
+  );
   for (const relativePath of packageJson.pi?.extensions ?? []) {
     assert.ok(fs.existsSync(path.resolve(relativePath.replace(/^\.\//, ""))), `missing Pi extension entrypoint: ${relativePath}`);
   }

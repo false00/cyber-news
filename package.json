@@ -57,7 +57,8 @@
   "pi": {
     "extensions": [
       "./dist/index.js"
-    ]
+    ],
+    "image": "https://cdn.jsdelivr.net/npm/@false00/cyber-news/docs/assets/cyber-news-widget.png"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
