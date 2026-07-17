@@ -63,6 +63,30 @@ test("extractFeedTitles handles Atom entry feeds", () => {
   ]);
 });
 
+test("extractFeedTitles unwraps repeated CDATA sections without regex backtracking", () => {
+  const xml = `
+    <rss>
+      <channel>
+        <item><title><![CDATA[Critical]]><![CDATA[ patch]]><![CDATA[ released]]></title></item>
+      </channel>
+    </rss>
+  `;
+
+  assert.deepEqual(__testing.extractFeedTitles(xml), ["Critical patch released"]);
+});
+
+test("extractFeedTitles decodes entities only once", () => {
+  const xml = `
+    <rss>
+      <channel>
+        <item><title>&amp;lt;script&amp;gt; alert &amp;amp; monitor</title></item>
+      </channel>
+    </rss>
+  `;
+
+  assert.deepEqual(__testing.extractFeedTitles(xml), ["&lt;script&gt; alert &amp; monitor"]);
+});
+
 test("extractFeedItems parses RSS, Atom, and namespaced feed dates", () => {
   const xml = `
     <rss>

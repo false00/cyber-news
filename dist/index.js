@@ -159,8 +159,18 @@ const CATEGORIES = [
     { icon: "🖥️", weight: 43, keywords: ["windows", "linux", "macos", "operating system", "kernel", "driver"] },
 ];
 function decodeEntities(text) {
+    const decodeCodePoint = (match, value) => {
+        if (!Number.isSafeInteger(value) || value < 0 || value > 0x10FFFF) {
+            return match;
+        }
+        try {
+            return String.fromCodePoint(value);
+        }
+        catch {
+            return match;
+        }
+    };
     return text
-        .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')
@@ -168,8 +178,9 @@ function decodeEntities(text) {
         .replace(/&#39;/g, "'")
         .replace(/&#x27;/g, "'")
         .replace(/&nbsp;/g, " ")
-        .replace(/&#x([0-9a-fA-F]+);/g, (_match, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
-        .replace(/&#(\d+);/g, (_match, decimal) => String.fromCodePoint(Number(decimal)));
+        .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => decodeCodePoint(match, Number.parseInt(hex, 16)))
+        .replace(/&#(\d+);/g, (match, decimal) => decodeCodePoint(match, Number(decimal)))
+        .replace(/&amp;/g, "&");
 }
 function stripTags(text) {
     return text.replace(/<[^>]+>/g, " ");
@@ -186,8 +197,31 @@ function normalizeText(text) {
 function escapeRegExp(text) {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function unwrapCdataSections(text) {
+    const open = "<![CDATA[";
+    const close = "]]>";
+    let cursor = 0;
+    let result = "";
+    while (cursor < text.length) {
+        const start = text.indexOf(open, cursor);
+        if (start === -1) {
+            result += text.slice(cursor);
+            break;
+        }
+        result += text.slice(cursor, start);
+        const contentStart = start + open.length;
+        const end = text.indexOf(close, contentStart);
+        if (end === -1) {
+            result += text.slice(start);
+            break;
+        }
+        result += text.slice(contentStart, end);
+        cursor = end + close.length;
+    }
+    return result;
+}
 function cleanFeedText(raw) {
-    return decodeEntities(stripTags(raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")))
+    return decodeEntities(stripTags(unwrapCdataSections(raw)))
         .replace(/\s+/g, " ")
         .trim();
 }
