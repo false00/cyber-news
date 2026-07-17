@@ -183,7 +183,27 @@ function decodeEntities(text) {
         .replace(/&amp;/g, "&");
 }
 function stripTags(text) {
-    return text.replace(/<[^>]+>/g, " ");
+    let result = "";
+    let tagBuffer;
+    for (const char of text) {
+        if (tagBuffer !== undefined) {
+            tagBuffer += char;
+            if (char === ">") {
+                result += " ";
+                tagBuffer = undefined;
+            }
+            continue;
+        }
+        if (char === "<") {
+            tagBuffer = char;
+            continue;
+        }
+        result += char;
+    }
+    if (tagBuffer !== undefined) {
+        result += tagBuffer;
+    }
+    return result;
 }
 function stripAnsi(text) {
     return text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");

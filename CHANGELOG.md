@@ -13,7 +13,7 @@ All notable changes to `@false00/cyber-news` are documented here.
 - Bumped the local Pi dev dependency floor to `@earendil-works/pi-coding-agent@^0.79.10` so `npm audit` clears the current high-severity transitive findings.
 
 ### Fixed
-- Reworked feed text cleanup to unwrap CDATA sections without the regex pattern flagged by CodeQL and to decode XML entities in a single pass instead of double-unescaping nested entities.
+- Reworked feed text cleanup to unwrap CDATA sections without the regex patterns flagged by CodeQL, decode XML entities in a single pass, and strip markup with a linear scan instead of backtracking regexes.
 
 ## 1.1.6 - 2026-07-01
 

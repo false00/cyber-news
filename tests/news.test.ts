@@ -87,6 +87,18 @@ test("extractFeedTitles decodes entities only once", () => {
   assert.deepEqual(__testing.extractFeedTitles(xml), ["&lt;script&gt; alert &amp; monitor"]);
 });
 
+test("extractFeedTitles strips balanced markup without swallowing malformed angle brackets", () => {
+  const xml = `
+    <rss>
+      <channel>
+        <item><title><![CDATA[<b>Critical</b> <<< note]]></title></item>
+      </channel>
+    </rss>
+  `;
+
+  assert.deepEqual(__testing.extractFeedTitles(xml), ["Critical <<< note"]);
+});
+
 test("extractFeedItems parses RSS, Atom, and namespaced feed dates", () => {
   const xml = `
     <rss>

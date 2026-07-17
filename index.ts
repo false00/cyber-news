@@ -241,7 +241,32 @@ function decodeEntities(text: string): string {
 }
 
 function stripTags(text: string): string {
-  return text.replace(/<[^>]+>/g, " ");
+  let result = "";
+  let tagBuffer: string | undefined;
+
+  for (const char of text) {
+    if (tagBuffer !== undefined) {
+      tagBuffer += char;
+      if (char === ">") {
+        result += " ";
+        tagBuffer = undefined;
+      }
+      continue;
+    }
+
+    if (char === "<") {
+      tagBuffer = char;
+      continue;
+    }
+
+    result += char;
+  }
+
+  if (tagBuffer !== undefined) {
+    result += tagBuffer;
+  }
+
+  return result;
 }
 
 function stripAnsi(text: string): string {
