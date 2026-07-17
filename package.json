@@ -73,7 +73,7 @@
     "@earendil-works/pi-coding-agent": "^0.79.10",
     "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "get-east-asian-width": "^1.6.0"
