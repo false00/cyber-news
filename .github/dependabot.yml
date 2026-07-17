@@ -9,6 +9,10 @@ updates:
       - dependencies
     commit-message:
       prefix: deps
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     groups:
       npm-minor-and-patch:
         patterns:
@@ -26,3 +30,14 @@ updates:
       - dependencies
     commit-message:
       prefix: ci
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    groups:
+      github-actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
