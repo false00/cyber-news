@@ -1,6 +1,6 @@
 {
   "name": "@false00/cyber-news",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Interactive cybersecurity news briefing for the Pi coding agent with live multi-source headlines and deep-dive story prompts",
   "type": "module",
   "main": "dist/index.js",
@@ -68,12 +68,12 @@
     "prepublishOnly": "npm test && npm pack --dry-run"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.79.0 <0.80.0"
+    "@earendil-works/pi-coding-agent": ">=0.79.0 <0.85.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.10",
-    "@types/node": "^25.3.0",
-    "tsx": "^4.21.0",
+    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "@types/node": "^25.9.5",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3"
   },
   "dependencies": {

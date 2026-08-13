@@ -4,6 +4,17 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.9 - 2026-08-13
+
+### Changed
+- Updated the Pi development dependency to `@earendil-works/pi-coding-agent@^0.84.1` and expanded the declared peer range through Pi 0.84.
+- Refreshed the development toolchain to `@types/node@^25.9.5` and `tsx@^4.23.12`.
+
+### Security
+- Pulled in patched transitive dependencies from Pi 0.84.1, clearing the current `npm audit` findings.
+
+## 1.1.8 - 2026-07-17
+
 ### Added
 - Dependabot updates for npm dependencies and GitHub Actions.
 - GitHub security automation with dependency review on pull requests and scheduled CodeQL scanning.

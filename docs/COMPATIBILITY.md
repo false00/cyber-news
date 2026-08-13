@@ -5,7 +5,7 @@
 ## Current expectations
 
 - **Node.js:** `>=20`
-- **Pi runtime:** a Pi build with extension support and the `ctx.ui` widget/command APIs used in `index.ts`
+- **Pi runtime:** `@earendil-works/pi-coding-agent` versions `>=0.79.0 <0.85.0` with the extension and `ctx.ui` APIs used in `index.ts`
 - **Network:** outbound HTTPS access to the enabled RSS and Atom sources
 - **Config storage:** read/write access to `~/.config/cyber-news/sources.json` for source enablement persistence
 
@@ -22,11 +22,11 @@ During this audit, the repository was exercised locally on:
 
 - **Node.js:** `v26.3.0`
 - **npm:** `11.16.0`
-- **Installed Pi package types available during development:** `@earendil-works/pi-coding-agent@0.79.6`
+- **Installed Pi package types available during development:** `@earendil-works/pi-coding-agent@0.84.1`
 
 ## Pi compatibility guidance
 
-The extension uses stable 0.79-era Pi APIs:
+The extension continues to use stable APIs available since Pi 0.79 and is typechecked and tested against Pi 0.84.1:
 
 - `pi.on(...)`
 - `pi.registerCommand(...)`
@@ -34,6 +34,8 @@ The extension uses stable 0.79-era Pi APIs:
 - `ctx.ui.notify(...)`
 - `ctx.ui.select(...)`
 - `ctx.ui.setWidget(...)`
+
+Pi 0.84.1 requires Node.js `>=22.19.0` for development. The extension keeps its own Node.js `>=20` floor because its supported peer range still includes earlier Pi versions.
 
 If Pi changes widget rendering, command context, or session custom-entry behavior in a future major release, re-test the package before publishing a new release.
 
