@@ -4,6 +4,13 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+### Changed
+- Updated the Pi development dependency to `@earendil-works/pi-coding-agent@^1.3.0` and widened the declared peer range to `>=0.79.0 <2.0.0`, so current Pi 1.x installs satisfy it.
+- Refreshed the development toolchain to `@types/node@^25.9.9` and `tsx@^4.23.15`, and the lockfile to `get-east-asian-width@1.7.0` (Unicode 18 width data).
+
+### Security
+- Pi 1.3.0 pins the patched `undici@8.10.2` and no longer ships an `npm-shrinkwrap.json`, so the development tree also resolves the patched `brace-expansion@5.0.12`. This clears the open Dependabot alerts and the current `npm audit` findings.
+
 ## 1.1.9 - 2026-08-13
 
 ### Changed
