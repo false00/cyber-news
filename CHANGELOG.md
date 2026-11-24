@@ -4,6 +4,12 @@ All notable changes to `@false00/cyber-news` are documented here.
 
 ## Unreleased
 
+## 1.1.11 - 2026-11-23
+
+### Security
+- Require Pi `>=1.5.0 <2.0.0` so supported installations include the undici TLS-validation fixes, and align the Node.js floor with Pi's `>=22.19.0` requirement.
+- Update the development Pi dependency to 1.6.x and validate on supported Node.js 22/24 CI targets.
+
 ## 1.1.10 - 2026-10-21
 
 ### Changed

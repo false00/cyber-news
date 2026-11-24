@@ -193,8 +193,8 @@ CHANGELOG.md              Release history
 
 Current project expectations:
 
-- Node.js `>=20`
-- Pi extension runtime support
+- Node.js `>=22.19.0`
+- Pi coding agent `>=1.5.0 <2.0.0`, including its undici security fixes
 - outbound HTTPS access to the enabled news feeds
 
 See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the maintained notes.
@@ -217,8 +217,9 @@ The test suite covers:
 ## Publishing
 
 ```bash
+npm test
 npm pack --dry-run
-npm publish
+npm publish --ignore-scripts
 ```
 
 Versioning and release discipline live in [AGENTS.md](AGENTS.md).

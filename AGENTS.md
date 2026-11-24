@@ -29,7 +29,8 @@ The package exists to give Pi users a small, trustworthy cybersecurity news brie
 - The package is intended for **Pi package installation via npm**.
 - The extension entrypoint must remain registered in `package.json` under `pi.extensions`.
 - The project intentionally **does not register custom LLM tools**; it adds commands, a widget, and lifecycle behavior only.
-- The current Node.js floor is **20+**.
+- The current Node.js floor is **22.19+**, matching the patched Pi host dependency.
+- The supported Pi host range is **>=1.5.0 <2.0.0**.
 
 ## Pi package conventions
 
