@@ -4,8 +4,8 @@
 
 ## Current expectations
 
-- **Node.js:** `>=20`
-- **Pi runtime:** `@earendil-works/pi-coding-agent` versions `>=0.79.0 <2.0.0` with the extension and `ctx.ui` APIs used in `index.ts`
+- **Node.js:** `>=22.19.0`
+- **Pi runtime:** `@earendil-works/pi-coding-agent` versions `>=1.5.0 <2.0.0` with the extension and `ctx.ui` APIs used in `index.ts`
 - **Network:** outbound HTTPS access to the enabled RSS and Atom sources
 - **Config storage:** read/write access to `~/.config/cyber-news/sources.json` for source enablement persistence
 
@@ -20,13 +20,13 @@ These are the things directly verified during maintenance work in this repo:
 
 During this audit, the repository was exercised locally on:
 
-- **Node.js:** `v26.3.0`
+- **Node.js:** `v24.22.3`
 - **npm:** `11.16.0`
-- **Installed Pi package types available during development:** `@earendil-works/pi-coding-agent@1.3.0`
+- **Installed Pi package types available during development:** `@earendil-works/pi-coding-agent@1.6.0`
 
 ## Pi compatibility guidance
 
-The extension continues to use stable APIs available since Pi 0.79 and is typechecked and tested against Pi 1.3.0:
+The extension continues to use stable Pi APIs and is typechecked and tested against Pi 1.6.0:
 
 - `pi.on(...)`
 - `pi.registerCommand(...)`
@@ -35,7 +35,7 @@ The extension continues to use stable APIs available since Pi 0.79 and is typech
 - `ctx.ui.select(...)`
 - `ctx.ui.setWidget(...)`
 
-Current Pi releases, including 1.3.0, require Node.js `>=22.19.0`, so Pi itself sets the practical Node.js floor. The extension keeps its own Node.js `>=20` floor because its code needs nothing newer; CI runs the typecheck, build, and test suite on Node.js 20 and 22.
+Pi 1.5.0 is the minimum supported host because it includes the undici TLS-validation fixes. Both Pi and this package require Node.js `>=22.19.0`; CI runs the typecheck, build, and test suite on Node.js 22 and 24.
 
 The `<2.0.0` upper bound follows semver for Pi 1.x, so later 1.x minors are accepted before this repository has tested them. Dependabot's weekly minor and patch updates bring each new Pi minor into CI for typechecking and tests. If Pi changes widget rendering, command context, or session custom-entry behavior in a future release, re-test the package before publishing a new release.
 
